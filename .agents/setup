@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+go_version="1.21.6"
+install_dir="$HOME/.local/share/go/$go_version"
+toolchain_link="$HOME/.local/share/mappe/go"
+profile_marker="# mappe Go toolchain"
+
+case "$(uname -m)" in
+	x86_64)
+		go_arch="amd64"
+		go_sha256="3f934f40ac360b9c01f616a9aa1796d227d8b0328bf64cb045c7b8c4ee9caea4"
+		;;
+	aarch64 | arm64)
+		go_arch="arm64"
+		go_sha256="e2e8aa88e1b5170a0d495d7d9c766af2b2b6c6925a8f8956d834ad6b4cacbd9a"
+		;;
+	*)
+		echo "Unsupported architecture: $(uname -m)" >&2
+		exit 1
+		;;
+esac
+
+if [[ ! -x "$install_dir/bin/go" ]]; then
+	echo "Installing Go $go_version..."
+	started=$SECONDS
+	tmp_dir="$(mktemp -d)"
+	trap 'rm -rf "$tmp_dir"' EXIT
+	archive="$tmp_dir/go.tar.gz"
+	curl --fail --location --silent --show-error \
+		"https://go.dev/dl/go${go_version}.linux-${go_arch}.tar.gz" \
+		--output "$archive"
+	echo "$go_sha256  $archive" | sha256sum --check --status
+	tar -xzf "$archive" -C "$tmp_dir"
+	mkdir -p "$(dirname "$install_dir")"
+	mv "$tmp_dir/go" "$install_dir"
+	echo "Installed Go $go_version in $((SECONDS - started))s."
+else
+	echo "Go $go_version is already installed."
+fi
+
+mkdir -p "$(dirname "$toolchain_link")"
+ln -sfn "$install_dir" "$toolchain_link"
+
+if ! grep -Fqx "$profile_marker" "$HOME/.bash_profile" 2>/dev/null; then
+	cat >> "$HOME/.bash_profile" <<'EOF'
+
+# mappe Go toolchain
+export PATH="$HOME/.local/share/mappe/go/bin:$PATH"
+EOF
+fi
+
+export PATH="$toolchain_link/bin:$PATH"
+echo "Downloading Go modules..."
+started=$SECONDS
+go mod download
+echo "Go modules are ready in $((SECONDS - started))s."
