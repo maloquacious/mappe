@@ -80,6 +80,12 @@ Generate the same raw height-map data as JSON with the command-line adapter:
 go run ./cmd/olsson -seed 42 > world.json
 ```
 
+Print the Mappe core version with:
+
+```sh
+go run ./cmd/olsson version
+```
+
 ## Development
 
 Mappe currently requires Go 1.21.6. In an Amp orb, `.agents/setup` installs the

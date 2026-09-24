@@ -18,11 +18,12 @@ package main
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"os"
 
+	"github.com/maloquacious/mappe"
 	"github.com/maloquacious/mappe/olsson"
+	"github.com/spf13/cobra"
 )
 
 type output struct {
@@ -34,32 +35,55 @@ type output struct {
 }
 
 func main() {
-	seed := flag.Int64("seed", 0x638bb317ac47a6ba, "pseudorandom seed")
-	width := flag.Int("width", 640, "map width (must be twice height)")
-	height := flag.Int("height", 320, "map height")
-	faults := flag.Int("faults", 100, "number of faults")
-	flag.Parse()
-
-	world, err := olsson.Generate(olsson.Config{
-		Seed:   *seed,
-		Width:  *width,
-		Height: *height,
-		Faults: *faults,
-	})
-	if err != nil {
+	cmd := newCommand()
+	if err := cmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
 
-	err = json.NewEncoder(os.Stdout).Encode(output{
-		Seed:       *seed,
-		Width:      world.Width(),
-		Height:     world.Height(),
-		Faults:     *faults,
-		Elevations: world.Elevations(),
-	})
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+func newCommand() *cobra.Command {
+	cfg := olsson.Config{
+		Seed:   0x638bb317ac47a6ba,
+		Width:  640,
+		Height: 320,
+		Faults: 100,
 	}
+
+	cmd := &cobra.Command{
+		Use:           "olsson",
+		Short:         "Generate an Olsson world height map",
+		Args:          cobra.NoArgs,
+		SilenceErrors: true,
+		SilenceUsage:  true,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			world, err := olsson.Generate(cfg)
+			if err != nil {
+				return err
+			}
+
+			return json.NewEncoder(cmd.OutOrStdout()).Encode(output{
+				Seed:       cfg.Seed,
+				Width:      world.Width(),
+				Height:     world.Height(),
+				Faults:     cfg.Faults,
+				Elevations: world.Elevations(),
+			})
+		},
+	}
+	cmd.Flags().Int64Var(&cfg.Seed, "seed", cfg.Seed, "pseudorandom seed")
+	cmd.Flags().IntVar(&cfg.Width, "width", cfg.Width, "map width (must be twice height)")
+	cmd.Flags().IntVar(&cfg.Height, "height", cfg.Height, "map height")
+	cmd.Flags().IntVar(&cfg.Faults, "faults", cfg.Faults, "number of faults")
+
+	cmd.AddCommand(&cobra.Command{
+		Use:   "version",
+		Short: "Print the Mappe version",
+		Args:  cobra.NoArgs,
+		Run: func(cmd *cobra.Command, _ []string) {
+			fmt.Fprintln(cmd.OutOrStdout(), mappe.Version().Core())
+		},
+	})
+
+	return cmd
 }
