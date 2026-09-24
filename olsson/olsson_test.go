@@ -83,17 +83,18 @@ func TestGenerateRejectsInvalidConfig(t *testing.T) {
 	tests := []struct {
 		name string
 		cfg  Config
+		want error
 	}{
-		{name: "nil source", cfg: Config{Width: 10, Height: 5}},
-		{name: "zero height", cfg: Config{Source: rand.NewPCG(1, 0), Width: 2, Height: 0}},
-		{name: "wrong aspect ratio", cfg: Config{Source: rand.NewPCG(1, 0), Width: 9, Height: 5}},
-		{name: "negative faults", cfg: Config{Source: rand.NewPCG(1, 0), Width: 10, Height: 5, Faults: -1}},
+		{name: "nil source", cfg: Config{Width: 10, Height: 5}, want: ErrNilSource},
+		{name: "zero height", cfg: Config{Source: rand.NewPCG(1, 0), Width: 2, Height: 0}, want: ErrInvalidHeight},
+		{name: "wrong aspect ratio", cfg: Config{Source: rand.NewPCG(1, 0), Width: 9, Height: 5}, want: ErrInvalidWidth},
+		{name: "negative faults", cfg: Config{Source: rand.NewPCG(1, 0), Width: 10, Height: 5, Faults: -1}, want: ErrInvalidFaults},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if _, err := Generate(tt.cfg); err == nil {
-				t.Fatal("Generate returned nil error")
+			if _, err := Generate(tt.cfg); err != tt.want {
+				t.Fatalf("Generate error = %v, want %v", err, tt.want)
 			}
 		})
 	}

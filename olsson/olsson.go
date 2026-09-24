@@ -25,9 +25,18 @@
 package olsson
 
 import (
-	"fmt"
 	"math"
 	"math/rand/v2"
+
+	"github.com/maloquacious/mappe/internal/cerrs"
+)
+
+// Configuration errors returned by Generate.
+const (
+	ErrNilSource     cerrs.Error = "olsson: source must not be nil"
+	ErrInvalidHeight cerrs.Error = "olsson: height must be positive"
+	ErrInvalidWidth  cerrs.Error = "olsson: width must be twice height"
+	ErrInvalidFaults cerrs.Error = "olsson: faults must not be negative"
 )
 
 // Config controls generation. Source must not be nil and is advanced during
@@ -73,16 +82,16 @@ func (m *Map) Elevations() []int {
 // Generate creates a deterministic height map from cfg.
 func Generate(cfg Config) (*Map, error) {
 	if cfg.Source == nil {
-		return nil, fmt.Errorf("olsson: source must not be nil")
+		return nil, ErrNilSource
 	}
 	if cfg.Height < 1 {
-		return nil, fmt.Errorf("olsson: height must be positive")
+		return nil, ErrInvalidHeight
 	}
 	if cfg.Width != 2*cfg.Height {
-		return nil, fmt.Errorf("olsson: width must be twice height")
+		return nil, ErrInvalidWidth
 	}
 	if cfg.Faults < 0 {
-		return nil, fmt.Errorf("olsson: faults must not be negative")
+		return nil, ErrInvalidFaults
 	}
 
 	rows := make([][]int, cfg.Height)
