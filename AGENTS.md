@@ -42,6 +42,14 @@ source projects, recording decisions, and migrating only approved capabilities.
 - When changing generated images or other visual output, inspect representative
   results in addition to running automated tests.
 
+## Delivery workflow
+
+- Work directly on `main` unless the user requests a different branch.
+- Assign every repository issue and pull request to `mdhender` when it is
+  created or first handled.
+- After the required tests pass, commit the task's changes to `main` and push
+  them to `origin/main` unless the user explicitly asks not to push.
+
 ## Repository hygiene
 
 - Keep generated artifacts and local environment files out of version control.
