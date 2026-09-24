@@ -1,2 +1,63 @@
-# mappe
-Fanatasy map generator
+# Mappe
+
+Mappe is the consolidation point for Michael D. Henderson's map and world
+generators. The project is currently in the inventory and review phase: each
+existing generator will be evaluated before code is migrated, rewritten, or
+left in its original repository.
+
+## Goals
+
+- Preserve useful generation algorithms, tests, fixtures, and documentation.
+- Make deterministic generation and reproducible output the default.
+- Reduce duplicated implementations without losing distinct generator models.
+- Record an explicit include-or-ignore decision for every candidate project.
+
+## Existing projects
+
+This inventory was surveyed on 2026-09-24 across the public repositories owned
+by [`mdhender`](https://github.com/mdhender),
+[`maloquacious`](https://github.com/maloquacious), and
+[`playbymail`](https://github.com/playbymail). The requested `malaquacious`
+organization does not exist; `maloquacious`, which owns this repository, was
+used instead. Private repositories and projects whose primary purpose is a game
+engine, map viewer/server, file converter, noise library, or grid primitive are
+outside this public inventory. No public standalone map generator was found in
+`playbymail`.
+
+“Last updated” is the date of the latest commit on the repository's default
+branch at the time of the survey.
+
+| Repository | Purpose | Brief status | Last updated | Review |
+| --- | --- | --- | --- | --- |
+| [`maloquacious/mappe`](https://github.com/maloquacious/mappe) | Consolidated map and world generators | Destination repository; inventory phase | 2026-09-24 | — |
+| [`mdhender/wgvc`](https://github.com/mdhender/wgvc) | Province-first world maps with JSON, SVG, and PNG output | Active Go implementation | 2026-09-20 | [#1](https://github.com/maloquacious/mappe/issues/1) |
+| [`mdhender/wgva`](https://github.com/mdhender/wgva) | Deterministic, effectively unbounded procedural hex worlds | Active Go implementation | 2026-09-15 | [#2](https://github.com/maloquacious/mappe/issues/2) |
+| [`mdhender/wgvb`](https://github.com/mdhender/wgvb) | Deterministic, effectively unbounded procedural hex worlds | Active Rust implementation; phases 1–7 reported complete | 2026-09-14 | [#3](https://github.com/maloquacious/mappe/issues/3) |
+| [`mdhender/worgen`](https://github.com/mdhender/worgen) | Star-system data based on *Architect of Worlds* | Active Go library and CLI | 2026-04-23 | [#4](https://github.com/maloquacious/mappe/issues/4) |
+| [`mdhender/lutymaps`](https://github.com/mdhender/lutymaps) | Galactic maps | Dormant Go prototype with minimal documentation | 2025-04-30 | [#5](https://github.com/maloquacious/mappe/issues/5) |
+| [`mdhender/aow`](https://github.com/mdhender/aow) | *Architect of Worlds* generation mechanics | Dormant Go prototype; likely overlaps `worgen` | 2024-08-09 | [#6](https://github.com/maloquacious/mappe/issues/6) |
+| [`mdhender/maze`](https://github.com/mdhender/maze) | Mazes generated with Wilson's algorithm | Released Go utility at v1.0.0 | 2024-07-27 | [#7](https://github.com/maloquacious/mappe/issues/7) |
+| [`mdhender/maps`](https://github.com/mdhender/maps) | Map-generation experiments | Dormant Go testbed with sparse documentation | 2024-06-26 | [#8](https://github.com/maloquacious/mappe/issues/8) |
+| [`mdhender/mapgen`](https://github.com/mdhender/mapgen) | Fantasy maps exposed through a web service | Dormant Go application; replaces `worldgen` | 2024-03-26 | [#9](https://github.com/maloquacious/mappe/issues/9) |
+| [`mdhender/worldgen`](https://github.com/mdhender/worldgen) | World maps based on John Olsson's generator | Archived Go application; superseded by `mapgen` | 2023-06-15 | [#10](https://github.com/maloquacious/mappe/issues/10) |
+
+## Review process
+
+The linked issue for each source project is the decision record. A review ends
+with one of two outcomes:
+
+- **Include:** identify what will move, what behavior and attribution must be
+  preserved, and the follow-up migration work.
+- **Ignore:** explain why the project is out of scope, redundant, or already
+  superseded.
+
+Code should not be imported until its review issue records a decision.
+
+## Development
+
+Mappe currently requires Go 1.21.6. In an Amp orb, `.agents/setup` installs the
+toolchain and downloads module dependencies. Run the repository checks with:
+
+```sh
+go test ./...
+```
