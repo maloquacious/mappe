@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
+	"math/rand/v2"
 	"sync"
 	"testing"
 )
@@ -25,12 +26,7 @@ var goldenTests = []struct {
 func TestGenerateGolden(t *testing.T) {
 	for _, tt := range goldenTests {
 		t.Run(fmt.Sprintf("seed_%d", tt.seed), func(t *testing.T) {
-			m, err := Generate(Config{
-				Seed:   tt.seed,
-				Width:  sourceWidth,
-				Height: sourceHeight,
-				Faults: sourceFaults,
-			})
+			m, err := Generate(testConfig(tt.seed))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -48,12 +44,7 @@ func TestGenerateIsIndependentAcrossConcurrentCalls(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			m, err := Generate(Config{
-				Seed:   tt.seed,
-				Width:  sourceWidth,
-				Height: sourceHeight,
-				Faults: sourceFaults,
-			})
+			m, err := Generate(testConfig(tt.seed))
 			if err != nil {
 				t.Error(err)
 				return
@@ -67,7 +58,12 @@ func TestGenerateIsIndependentAcrossConcurrentCalls(t *testing.T) {
 }
 
 func TestGenerateWithoutFaultsIsFlat(t *testing.T) {
-	m, err := Generate(Config{Seed: 7, Width: 10, Height: 5, Faults: 0})
+	m, err := Generate(Config{
+		Source: rand.NewPCG(7, 0),
+		Width:  10,
+		Height: 5,
+		Faults: 0,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,9 +84,10 @@ func TestGenerateRejectsInvalidConfig(t *testing.T) {
 		name string
 		cfg  Config
 	}{
-		{name: "zero height", cfg: Config{Width: 2, Height: 0}},
-		{name: "wrong aspect ratio", cfg: Config{Width: 9, Height: 5}},
-		{name: "negative faults", cfg: Config{Width: 10, Height: 5, Faults: -1}},
+		{name: "nil source", cfg: Config{Width: 10, Height: 5}},
+		{name: "zero height", cfg: Config{Source: rand.NewPCG(1, 0), Width: 2, Height: 0}},
+		{name: "wrong aspect ratio", cfg: Config{Source: rand.NewPCG(1, 0), Width: 9, Height: 5}},
+		{name: "negative faults", cfg: Config{Source: rand.NewPCG(1, 0), Width: 10, Height: 5, Faults: -1}},
 	}
 
 	for _, tt := range tests {
@@ -99,6 +96,15 @@ func TestGenerateRejectsInvalidConfig(t *testing.T) {
 				t.Fatal("Generate returned nil error")
 			}
 		})
+	}
+}
+
+func testConfig(seed int64) Config {
+	return Config{
+		Source: rand.NewPCG(uint64(seed), 0),
+		Width:  sourceWidth,
+		Height: sourceHeight,
+		Faults: sourceFaults,
 	}
 }
 

@@ -19,6 +19,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand/v2"
 	"os"
 
 	"github.com/maloquacious/mappe"
@@ -43,8 +44,8 @@ func main() {
 }
 
 func newCommand() *cobra.Command {
+	seed := int64(0x638bb317ac47a6ba)
 	cfg := olsson.Config{
-		Seed:   0x638bb317ac47a6ba,
 		Width:  640,
 		Height: 320,
 		Faults: 100,
@@ -57,13 +58,14 @@ func newCommand() *cobra.Command {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			cfg.Source = rand.NewPCG(uint64(seed), 0)
 			world, err := olsson.Generate(cfg)
 			if err != nil {
 				return err
 			}
 
 			return json.NewEncoder(cmd.OutOrStdout()).Encode(output{
-				Seed:       cfg.Seed,
+				Seed:       seed,
 				Width:      world.Width(),
 				Height:     world.Height(),
 				Faults:     cfg.Faults,
@@ -71,7 +73,7 @@ func newCommand() *cobra.Command {
 			})
 		},
 	}
-	cmd.Flags().Int64Var(&cfg.Seed, "seed", cfg.Seed, "pseudorandom seed")
+	cmd.Flags().Int64Var(&seed, "seed", seed, "pseudorandom seed")
 	cmd.Flags().IntVar(&cfg.Width, "width", cfg.Width, "map width (must be twice height)")
 	cmd.Flags().IntVar(&cfg.Height, "height", cfg.Height, "map height")
 	cmd.Flags().IntVar(&cfg.Faults, "faults", cfg.Faults, "number of faults")

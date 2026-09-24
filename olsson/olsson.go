@@ -30,10 +30,11 @@ import (
 	"math/rand/v2"
 )
 
-// Config controls generation. Width must be twice Height, matching the
-// equirectangular layout of the source generator.
+// Config controls generation. Source must not be nil and is advanced during
+// generation. Width must be twice Height, matching the equirectangular layout
+// of the source generator.
 type Config struct {
-	Seed   int64
+	Source rand.Source
 	Width  int
 	Height int
 	Faults int
@@ -71,6 +72,9 @@ func (m *Map) Elevations() []int {
 
 // Generate creates a deterministic height map from cfg.
 func Generate(cfg Config) (*Map, error) {
+	if cfg.Source == nil {
+		return nil, fmt.Errorf("olsson: source must not be nil")
+	}
 	if cfg.Height < 1 {
 		return nil, fmt.Errorf("olsson: height must be positive")
 	}
@@ -96,8 +100,7 @@ func Generate(cfg Config) (*Map, error) {
 		sinPhi[x+cfg.Width] = sinPhi[x]
 	}
 
-	// The second PCG seed is fixed so Config.Seed fully determines the stream.
-	rnd := rand.New(rand.NewPCG(uint64(cfg.Seed), 0))
+	rnd := rand.New(cfg.Source)
 	for fault := 0; fault < cfg.Faults; fault++ {
 		generateFault(rows, sinPhi, rnd, rnd.IntN(2) == 0)
 	}

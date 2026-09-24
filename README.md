@@ -61,13 +61,13 @@ Package `olsson` contains the deterministic spherical great-circle fault
 generator migrated from [`mdhender/worldgen`](https://github.com/mdhender/worldgen).
 That repository preserved and ported John Olsson's original C world-map
 generator. The migration retains its equirectangular map construction while
-using a local `math/rand/v2` PCG stream in place of process-global randomness.
-The source commands, rendering, projections, and unrelated experimental
-generators remain intentionally omitted.
+accepting a caller-owned `math/rand/v2` source in place of process-global
+randomness. The source commands, rendering, projections, and unrelated
+experimental generators remain intentionally omitted.
 
 ```go
 world, err := olsson.Generate(olsson.Config{
-	Seed:   42,
+	Source: rand.NewPCG(42, 0),
 	Width:  640,
 	Height: 320,
 	Faults: 100,
