@@ -17,9 +17,9 @@ left in its original repository.
 This inventory was surveyed on 2026-09-24 across the public repositories owned
 by [`mdhender`](https://github.com/mdhender),
 [`maloquacious`](https://github.com/maloquacious), and
-[`playbymail`](https://github.com/playbymail). The requested `malaquacious`
-organization does not exist; `maloquacious`, which owns this repository, was
-used instead. Private repositories and projects whose primary purpose is a game
+[`playbymail`](https://github.com/playbymail).
+
+Private repositories and projects whose primary purpose is a game
 engine, map viewer/server, file converter, noise library, or grid primitive are
 outside this public inventory. No public standalone map generator was found in
 `playbymail`.
