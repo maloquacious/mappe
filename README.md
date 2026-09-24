@@ -39,7 +39,7 @@ branch at the time of the survey.
 | [`mdhender/maze`](https://github.com/mdhender/maze) | Mazes generated with Wilson's algorithm | Released Go utility at v1.0.0 | 2024-07-27 | [#7](https://github.com/maloquacious/mappe/issues/7) |
 | [`mdhender/maps`](https://github.com/mdhender/maps) | Map-generation experiments | Dormant Go testbed with sparse documentation | 2024-06-26 | [#8](https://github.com/maloquacious/mappe/issues/8) |
 | [`mdhender/mapgen`](https://github.com/mdhender/mapgen) | Fantasy maps exposed through a web service | Dormant Go application; replaces `worldgen` | 2024-03-26 | [#9](https://github.com/maloquacious/mappe/issues/9) |
-| [`mdhender/worldgen`](https://github.com/mdhender/worldgen) | World maps based on John Olsson's generator | Archived Go application; superseded by `mapgen` | 2023-06-15 | [#10](https://github.com/maloquacious/mappe/issues/10) |
+| [`mdhender/worldgen`](https://github.com/mdhender/worldgen) | World maps based on John Olsson's generator | Included; ancestral fault generator migrated as `olsson` | 2023-06-15 | [#10](https://github.com/maloquacious/mappe/issues/10) |
 
 ## Review process
 
@@ -52,6 +52,27 @@ with one of two outcomes:
   superseded.
 
 Code should not be imported until its review issue records a decision.
+
+## Included generators
+
+### `olsson`
+
+Package `olsson` contains the deterministic spherical great-circle fault
+generator migrated from [`mdhender/worldgen`](https://github.com/mdhender/worldgen).
+That repository preserved and ported John Olsson's original C world-map
+generator. The migration retains its equirectangular output and pseudorandom
+number consumption while replacing process-global state and file output with a
+library API. Commands, rendering, projections, and unrelated experimental
+generators remain intentionally omitted.
+
+```go
+world, err := olsson.Generate(olsson.Config{
+	Seed:   42,
+	Width:  640,
+	Height: 320,
+	Faults: 100,
+})
+```
 
 ## Development
 
