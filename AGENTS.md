@@ -27,6 +27,7 @@ source projects, recording decisions, and migrating only approved capabilities.
 - Run `go mod tidy` after dependency changes and review both module files.
 - Keep generators deterministic: make seeds and configuration explicit, avoid
   wall-clock or process-global randomness, and keep serialized output stable.
+- Always use `math/rand/v2`; do not add new uses of `math/rand`.
 - Avoid mutable package-level state. Return errors rather than logging or
   exiting from library code.
 - Keep generator-specific code and tests together behind a clear package API;

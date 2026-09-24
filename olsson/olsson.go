@@ -19,15 +19,15 @@
 //
 // This implementation was migrated from github.com/mdhender/worldgen, which
 // preserved and later ported John Olsson's original C generator. It retains
-// the source generator's random-number consumption and map construction while
-// replacing its process-global state and file output with an explicit library
+// the source generator's map construction while replacing its process-global
+// state, legacy pseudorandom source, and file output with an explicit library
 // API.
 package olsson
 
 import (
 	"fmt"
 	"math"
-	"math/rand"
+	"math/rand/v2"
 )
 
 // Config controls generation. Width must be twice Height, matching the
@@ -96,9 +96,10 @@ func Generate(cfg Config) (*Map, error) {
 		sinPhi[x+cfg.Width] = sinPhi[x]
 	}
 
-	rnd := rand.New(rand.NewSource(cfg.Seed))
+	// The second PCG seed is fixed so Config.Seed fully determines the stream.
+	rnd := rand.New(rand.NewPCG(uint64(cfg.Seed), 0))
 	for fault := 0; fault < cfg.Faults; fault++ {
-		generateFault(rows, sinPhi, rnd, rnd.Intn(2) == 0)
+		generateFault(rows, sinPhi, rnd, rnd.IntN(2) == 0)
 	}
 
 	// The source computes half the map and mirrors it around the seam.

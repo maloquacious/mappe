@@ -1,6 +1,6 @@
 module github.com/maloquacious/mappe
 
-go 1.21.6
+go 1.22.12
 
 require (
 	github.com/maloquacious/semver v0.4.1

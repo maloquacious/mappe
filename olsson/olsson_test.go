@@ -14,16 +14,16 @@ const (
 	sourceFaults = 100
 )
 
-func TestGenerateMatchesWorldgen(t *testing.T) {
-	tests := []struct {
-		seed int64
-		want string
-	}{
-		{seed: 0, want: "87783ea7670f02c18612fea0b93e5958748e93e004a448d3ea2fdbf3d5e7b3ac"},
-		{seed: 0x638bb317ac47a6ba, want: "8ad30d5ff876ca922ec1262c1f7cdafd91b084e7816e71bfd789e6d97c08ad31"},
-	}
+var goldenTests = []struct {
+	seed int64
+	want string
+}{
+	{seed: 0, want: "ee524377b9b1f398f728ecee3abef06163991e1f8979fedaf2635556f79813e6"},
+	{seed: 0x638bb317ac47a6ba, want: "f2117b23bc908767c610bccab2b8361dc2a2e906f96592fc4f2621352acbb04a"},
+}
 
-	for _, tt := range tests {
+func TestGenerateGolden(t *testing.T) {
+	for _, tt := range goldenTests {
 		t.Run(fmt.Sprintf("seed_%d", tt.seed), func(t *testing.T) {
 			m, err := Generate(Config{
 				Seed:   tt.seed,
@@ -35,23 +35,15 @@ func TestGenerateMatchesWorldgen(t *testing.T) {
 				t.Fatal(err)
 			}
 			if got := checksum(m); got != tt.want {
-				t.Fatalf("checksum = %s, want source checksum %s", got, tt.want)
+				t.Fatalf("checksum = %s, want %s", got, tt.want)
 			}
 		})
 	}
 }
 
 func TestGenerateIsIndependentAcrossConcurrentCalls(t *testing.T) {
-	tests := []struct {
-		seed int64
-		want string
-	}{
-		{seed: 0, want: "87783ea7670f02c18612fea0b93e5958748e93e004a448d3ea2fdbf3d5e7b3ac"},
-		{seed: 0x638bb317ac47a6ba, want: "8ad30d5ff876ca922ec1262c1f7cdafd91b084e7816e71bfd789e6d97c08ad31"},
-	}
-
 	var wg sync.WaitGroup
-	for _, tt := range tests {
+	for _, tt := range goldenTests {
 		tt := tt
 		wg.Add(1)
 		go func() {

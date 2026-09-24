@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-go_version="1.21.6"
+go_version="1.22.12"
 install_dir="$HOME/.local/share/go/$go_version"
 toolchain_link="$HOME/.local/share/mappe/go"
 profile_marker="# mappe Go toolchain"
@@ -9,11 +9,11 @@ profile_marker="# mappe Go toolchain"
 case "$(uname -m)" in
 	x86_64)
 		go_arch="amd64"
-		go_sha256="3f934f40ac360b9c01f616a9aa1796d227d8b0328bf64cb045c7b8c4ee9caea4"
+		go_sha256="4fa4f869b0f7fc6bb1eb2660e74657fbf04cdd290b5aef905585c86051b34d43"
 		;;
 	aarch64 | arm64)
 		go_arch="arm64"
-		go_sha256="e2e8aa88e1b5170a0d495d7d9c766af2b2b6c6925a8f8956d834ad6b4cacbd9a"
+		go_sha256="fd017e647ec28525e86ae8203236e0653242722a7436929b1f775744e26278e7"
 		;;
 	*)
 		echo "Unsupported architecture: $(uname -m)" >&2
