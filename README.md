@@ -38,7 +38,7 @@ branch at the time of the survey.
 | [`mdhender/aow`](https://github.com/mdhender/aow) | *Architect of Worlds* generation mechanics | Dormant Go prototype; likely overlaps `worgen` | 2024-08-09 | [#6](https://github.com/maloquacious/mappe/issues/6) |
 | [`mdhender/maze`](https://github.com/mdhender/maze) | Mazes generated with Wilson's algorithm | Released Go utility at v1.0.0 | 2024-07-27 | [#7](https://github.com/maloquacious/mappe/issues/7) |
 | [`mdhender/maps`](https://github.com/mdhender/maps) | Map-generation experiments | Dormant Go testbed with sparse documentation | 2024-06-26 | [#8](https://github.com/maloquacious/mappe/issues/8) |
-| [`mdhender/mapgen`](https://github.com/mdhender/mapgen) | Fantasy maps exposed through a web service | Dormant Go application; replaces `worldgen` | 2024-03-26 | [#9](https://github.com/maloquacious/mappe/issues/9) |
+| [`mdhender/mapgen`](https://github.com/mdhender/mapgen) | Fantasy maps exposed through a web service | Partially included; flat generator migrated | 2024-03-26 | [#9](https://github.com/maloquacious/mappe/issues/9) |
 | [`mdhender/worldgen`](https://github.com/mdhender/worldgen) | World maps based on John Olsson's generator | Included; ancestral fault generator migrated as `olsson` | 2023-06-15 | [#10](https://github.com/maloquacious/mappe/issues/10) |
 
 ## Review process
@@ -88,6 +88,17 @@ Print the Mappe core version with:
 ```sh
 go run ./cmd/olsson version
 ```
+
+### `internal/generators/flat`
+
+Package `internal/generators/flat` contains the planar circular-fracture
+generator migrated from
+[`mdhender/mapgen`](https://github.com/mdhender/mapgen/tree/main/pkg/generators/flat).
+Each iteration raises or lowers a uniformly sized circular region. Circles may
+be clipped at the map edges or wrap across both axes. The package accepts a
+caller-owned `math/rand/v2` source and returns a `domains.NormalizedHeightMap`;
+a flat map contains only zero elevations. It remains internal until an accepted
+pipeline establishes its public integration boundary.
 
 ## Stages and pipelines
 
