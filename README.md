@@ -89,6 +89,29 @@ Print the Mappe core version with:
 go run ./cmd/olsson version
 ```
 
+## Stages and pipelines
+
+A generator stage starts with a random source and generation values such as
+height and width, and produces a domain object. A renderer stage translates a
+domain object into another domain object or an external format. A pipeline
+arranges generator and renderer stages to create an artifact.
+
+Package `renderers/monochromepng` translates a `domains.NormalizedHeightMap`
+into an 8-bit grayscale PNG. Elevation `0` is black, elevation `1` is white,
+and intermediate elevations are rounded to the nearest grayscale value.
+
+The named `olsson-monochrome-png` pipeline composes the `olsson` generator with
+that renderer. Run it through the Cobra-based `mappe` command:
+
+```sh
+go run ./cmd/mappe olsson-monochrome-png \
+  --seed 42 \
+  --width 640 \
+  --height 320 \
+  --faults 100 \
+  --output world.png
+```
+
 ## Development
 
 Mappe currently requires Go 1.22.12. In an Amp orb, `.agents/setup` installs the
