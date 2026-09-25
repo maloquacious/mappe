@@ -9,6 +9,8 @@ import (
 	"slices"
 	"sync"
 	"testing"
+
+	"github.com/maloquacious/mappe/domains"
 )
 
 const (
@@ -25,7 +27,7 @@ var goldenTests = []struct {
 	{seed: 0x638bb317ac47a6ba, want: "f2117b23bc908767c610bccab2b8361dc2a2e906f96592fc4f2621352acbb04a"},
 }
 
-func TestGenerateGolden(t *testing.T) {
+func TestGenerateRawGolden(t *testing.T) {
 	for _, tt := range goldenTests {
 		t.Run(fmt.Sprintf("seed_%d", tt.seed), func(t *testing.T) {
 			elevations, err := generateRaw(testConfig(tt.seed))
@@ -39,10 +41,10 @@ func TestGenerateGolden(t *testing.T) {
 	}
 }
 
-func TestGenerateIsIndependentAcrossConcurrentCalls(t *testing.T) {
+func TestGenerateNormalizedHeightMapIsIndependentAcrossConcurrentCalls(t *testing.T) {
 	wants := make(map[int64]string, len(goldenTests))
 	for _, tt := range goldenTests {
-		m, err := Generate(testConfig(tt.seed))
+		m, err := GenerateNormalizedHeightMap(testConfig(tt.seed))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -55,7 +57,7 @@ func TestGenerateIsIndependentAcrossConcurrentCalls(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			m, err := Generate(testConfig(tt.seed))
+			m, err := GenerateNormalizedHeightMap(testConfig(tt.seed))
 			if err != nil {
 				t.Error(err)
 				return
@@ -76,8 +78,8 @@ func TestNormalize(t *testing.T) {
 	}
 }
 
-func TestGenerateUsesFullNormalizedRange(t *testing.T) {
-	m, err := Generate(testConfig(42))
+func TestGenerateNormalizedHeightMapUsesFullRange(t *testing.T) {
+	m, err := GenerateNormalizedHeightMap(testConfig(42))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,8 +97,8 @@ func TestGenerateUsesFullNormalizedRange(t *testing.T) {
 	}
 }
 
-func TestGenerateWithoutFaultsIsFlat(t *testing.T) {
-	m, err := Generate(Config{
+func TestGenerateNormalizedHeightMapWithoutFaultsIsFlat(t *testing.T) {
+	m, err := GenerateNormalizedHeightMap(Config{
 		Source: rand.NewPCG(7, 0),
 		Width:  10,
 		Height: 5,
@@ -117,7 +119,7 @@ func TestGenerateWithoutFaultsIsFlat(t *testing.T) {
 	}
 }
 
-func TestGenerateRejectsInvalidConfig(t *testing.T) {
+func TestGenerateNormalizedHeightMapRejectsInvalidConfig(t *testing.T) {
 	tests := []struct {
 		name string
 		cfg  Config
@@ -131,22 +133,10 @@ func TestGenerateRejectsInvalidConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if _, err := Generate(tt.cfg); err != tt.want {
-				t.Fatalf("Generate error = %v, want %v", err, tt.want)
+			if _, err := GenerateNormalizedHeightMap(tt.cfg); err != tt.want {
+				t.Fatalf("GenerateNormalizedHeightMap error = %v, want %v", err, tt.want)
 			}
 		})
-	}
-}
-
-func TestElevationsReturnsCopy(t *testing.T) {
-	m, err := Generate(testConfig(42))
-	if err != nil {
-		t.Fatal(err)
-	}
-	elevations := m.Elevations()
-	elevations[0] = math.NaN()
-	if math.IsNaN(m.Elevation(0, 0)) {
-		t.Fatal("modifying Elevations result changed map")
 	}
 }
 
@@ -169,7 +159,7 @@ func rawChecksum(elevations []int) string {
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
-func normalizedChecksum(m *Map) string {
+func normalizedChecksum(m *domains.NormalizedHeightMap) string {
 	h := sha256.New()
 	var buf [8]byte
 	for _, elevation := range m.Elevations() {

@@ -74,7 +74,7 @@ func TestGenerateCommandRoundTripsNormalizedElevations(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
 		t.Fatal(err)
 	}
-	want, err := olsson.Generate(olsson.Config{
+	want, err := olsson.GenerateNormalizedHeightMap(olsson.Config{
 		Source: rand.NewPCG(42, 0),
 		Width:  10,
 		Height: 5,

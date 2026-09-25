@@ -28,10 +28,11 @@ import (
 	"math"
 	"math/rand/v2"
 
+	"github.com/maloquacious/mappe/domains"
 	"github.com/maloquacious/mappe/internal/cerrs"
 )
 
-// Configuration errors returned by Generate.
+// Configuration errors returned by GenerateNormalizedHeightMap.
 const (
 	ErrNilSource     cerrs.Error = "olsson: source must not be nil"
 	ErrInvalidHeight cerrs.Error = "olsson: height must be positive"
@@ -49,49 +50,16 @@ type Config struct {
 	Faults int
 }
 
-// Map is an equirectangular height map with elevations normalized to [0, 1].
-type Map struct {
-	width      int
-	height     int
-	elevations []float64
-}
-
-// Width returns the number of columns in the map.
-func (m *Map) Width() int { return m.width }
-
-// Height returns the number of rows in the map.
-func (m *Map) Height() int { return m.height }
-
-// Elevation returns the generated elevation at (x, y). It panics when either
-// coordinate is outside the map.
-func (m *Map) Elevation(x, y int) float64 {
-	if x < 0 || x >= m.width || y < 0 || y >= m.height {
-		panic("olsson: coordinates outside map")
-	}
-	return m.elevations[y*m.width+x]
-}
-
-// Elevations returns the map's elevations in row-major order. The returned
-// slice is a copy and may be modified by the caller.
-func (m *Map) Elevations() []float64 {
-	elevations := make([]float64, len(m.elevations))
-	copy(elevations, m.elevations)
-	return elevations
-}
-
-// Generate creates a deterministic height map from cfg. Non-flat maps span
-// the full [0, 1] elevation range. Flat maps contain only zero elevations.
-func Generate(cfg Config) (*Map, error) {
+// GenerateNormalizedHeightMap creates a deterministic normalized height map
+// from cfg. Non-flat maps span the full [0, 1] elevation range. Flat maps
+// contain only zero elevations.
+func GenerateNormalizedHeightMap(cfg Config) (*domains.NormalizedHeightMap, error) {
 	elevations, err := generateRaw(cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Map{
-		width:      cfg.Width,
-		height:     cfg.Height,
-		elevations: normalize(elevations),
-	}, nil
+	return domains.NewNormalizedHeightMap(cfg.Width, cfg.Height, normalize(elevations))
 }
 
 func generateRaw(cfg Config) ([]int, error) {

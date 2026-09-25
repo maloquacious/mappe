@@ -59,7 +59,7 @@ func newCommand() *cobra.Command {
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			cfg.Source = rand.NewPCG(uint64(seed), 0)
-			world, err := olsson.Generate(cfg)
+			world, err := olsson.GenerateNormalizedHeightMap(cfg)
 			if err != nil {
 				return err
 			}
