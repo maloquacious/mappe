@@ -22,7 +22,9 @@ import (
 	"os"
 
 	"github.com/maloquacious/mappe"
+	"github.com/maloquacious/mappe/internal/generators/flat"
 	"github.com/maloquacious/mappe/olsson"
+	"github.com/maloquacious/mappe/pipelines/flatmonochromepng"
 	"github.com/maloquacious/mappe/pipelines/olssonmonochromepng"
 	"github.com/spf13/cobra"
 )
@@ -42,6 +44,7 @@ func newCommand() *cobra.Command {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 	}
+	cmd.AddCommand(newFlatMonochromePNGCommand())
 	cmd.AddCommand(newOlssonMonochromePNGCommand())
 	cmd.AddCommand(&cobra.Command{
 		Use:   "version",
@@ -52,6 +55,49 @@ func newCommand() *cobra.Command {
 		},
 	})
 	return cmd
+}
+
+func newFlatMonochromePNGCommand() *cobra.Command {
+	seed := int64(42)
+	outputPath := ""
+	cfg := flat.Config{
+		Width:      640,
+		Height:     320,
+		Iterations: 100,
+	}
+
+	cmd := &cobra.Command{
+		Use:   "flat-monochrome-png",
+		Short: "Run the flat generator and monochrome PNG renderer",
+		Args:  cobra.NoArgs,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			cfg.Source = rand.NewPCG(uint64(seed), 0)
+			return writeFlatMonochromePNG(outputPath, cfg)
+		},
+	}
+	cmd.Flags().Int64Var(&seed, "seed", seed, "pseudorandom seed")
+	cmd.Flags().IntVar(&cfg.Width, "width", cfg.Width, "map width")
+	cmd.Flags().IntVar(&cfg.Height, "height", cfg.Height, "map height")
+	cmd.Flags().IntVar(&cfg.Iterations, "iterations", cfg.Iterations, "number of circular fractures")
+	cmd.Flags().BoolVar(&cfg.Wrap, "wrap", cfg.Wrap, "wrap circles across both map axes")
+	cmd.Flags().StringVarP(&outputPath, "output", "o", outputPath, "PNG output path")
+	_ = cmd.MarkFlagRequired("output")
+	return cmd
+}
+
+func writeFlatMonochromePNG(path string, cfg flat.Config) error {
+	output, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("create output: %w", err)
+	}
+	if err := flatmonochromepng.Run(output, cfg); err != nil {
+		_ = output.Close()
+		return err
+	}
+	if err := output.Close(); err != nil {
+		return fmt.Errorf("close output: %w", err)
+	}
+	return nil
 }
 
 func newOlssonMonochromePNGCommand() *cobra.Command {

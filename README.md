@@ -123,6 +123,20 @@ go run ./cmd/mappe olsson-monochrome-png \
   --output world.png
 ```
 
+The named `flat-monochrome-png` pipeline composes the flat circular-fracture
+generator with the same renderer. Use `--wrap` to wrap generated circles across
+both map axes:
+
+```sh
+go run ./cmd/mappe flat-monochrome-png \
+  --seed 42 \
+  --width 640 \
+  --height 320 \
+  --iterations 100 \
+  --wrap \
+  --output flat.png
+```
+
 ## Development
 
 Mappe currently requires Go 1.22.12. In an Amp orb, `.agents/setup` installs the
