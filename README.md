@@ -97,8 +97,8 @@ generator migrated from
 Each iteration raises or lowers a uniformly sized circular region. Circles may
 be clipped at the map edges or wrap across both axes. The package accepts a
 caller-owned `math/rand/v2` source and returns a `domains.NormalizedHeightMap`;
-a flat map contains only zero elevations. It remains internal until an accepted
-pipeline establishes its public integration boundary.
+a flat map contains only zero elevations. It remains internal, with named
+pipelines providing its public integration boundary.
 
 ## Stages and pipelines
 
@@ -110,6 +110,13 @@ arranges generator and renderer stages to create an artifact.
 Package `renderers/monochromepng` translates a `domains.NormalizedHeightMap`
 into an 8-bit grayscale PNG. Elevation `0` is black, elevation `1` is white,
 and intermediate elevations are rounded to the nearest grayscale value.
+
+Package `renderers/cartographicpng` translates the same domain into an opaque
+land, ocean, and ice PNG using the histogram-derived bands and discrete color
+palettes preserved from `mdhender/worldgen` and John Olsson's generator. The
+default configuration allocates 55 percent of pixels to ocean, 8 percent to
+ice, and the remainder to land. Whole elevation bins are never split, so the
+actual proportions may cross those targets at a boundary.
 
 The named `olsson-monochrome-png` pipeline composes the `olsson` generator with
 that renderer. Run it through the Cobra-based `mappe` command:
@@ -135,6 +142,31 @@ go run ./cmd/mappe flat-monochrome-png \
   --iterations 100 \
   --wrap \
   --output flat.png
+```
+
+The named `olsson-cartographic-png` and `flat-cartographic-png` pipelines
+compose their respective generators with the cartographic renderer. Override
+the source defaults with `--ocean-percent` and `--ice-percent`:
+
+```sh
+go run ./cmd/mappe olsson-cartographic-png \
+  --seed 42 \
+  --width 640 \
+  --height 320 \
+  --faults 100 \
+  --ocean-percent 55 \
+  --ice-percent 8 \
+  --output world-color.png
+
+go run ./cmd/mappe flat-cartographic-png \
+  --seed 42 \
+  --width 640 \
+  --height 320 \
+  --iterations 10000 \
+  --wrap \
+  --ocean-percent 55 \
+  --ice-percent 8 \
+  --output flat-color.png
 ```
 
 ## Development

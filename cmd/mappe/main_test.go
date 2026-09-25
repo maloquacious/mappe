@@ -11,8 +11,11 @@ import (
 	"github.com/maloquacious/mappe"
 	"github.com/maloquacious/mappe/internal/generators/flat"
 	"github.com/maloquacious/mappe/olsson"
+	"github.com/maloquacious/mappe/pipelines/flatcartographicpng"
 	"github.com/maloquacious/mappe/pipelines/flatmonochromepng"
+	"github.com/maloquacious/mappe/pipelines/olssoncartographicpng"
 	"github.com/maloquacious/mappe/pipelines/olssonmonochromepng"
+	"github.com/maloquacious/mappe/renderers/cartographicpng"
 )
 
 func TestVersionCommand(t *testing.T) {
@@ -26,6 +29,54 @@ func TestVersionCommand(t *testing.T) {
 	}
 	if got, want := stdout.String(), mappe.Version().Core()+"\n"; got != want {
 		t.Fatalf("stdout = %q, want %q", got, want)
+	}
+}
+
+func TestFlatCartographicPNGCommandWritesSelectedArtifact(t *testing.T) {
+	outputPath := filepath.Join(t.TempDir(), "flat-color.png")
+	cmd := newCommand()
+	cmd.SetArgs([]string{
+		"flat-cartographic-png",
+		"--output", outputPath,
+		"--seed", "42",
+		"--width", "10",
+		"--height", "6",
+		"--iterations", "20",
+		"--wrap",
+		"--ocean-percent", "25",
+		"--ice-percent", "15",
+	})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	img, err := png.Decode(bytes.NewReader(got))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if img.Bounds().Dx() != 10 || img.Bounds().Dy() != 6 {
+		t.Fatalf("image size = %dx%d, want 10x6", img.Bounds().Dx(), img.Bounds().Dy())
+	}
+
+	var want bytes.Buffer
+	rendererConfig := cartographicpng.DefaultConfig()
+	rendererConfig.OceanPercent = 25
+	rendererConfig.IcePercent = 15
+	if err := flatcartographicpng.Run(&want, flat.Config{
+		Source:     rand.NewPCG(42, 0),
+		Width:      10,
+		Height:     6,
+		Iterations: 20,
+		Wrap:       true,
+	}, rendererConfig); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, want.Bytes()) {
+		t.Fatal("command flags did not produce the selected pipeline output")
 	}
 }
 
@@ -89,6 +140,52 @@ func TestFlatMonochromePNGCommandRequiresOutput(t *testing.T) {
 	}
 }
 
+func TestOlssonCartographicPNGCommandWritesSelectedArtifact(t *testing.T) {
+	outputPath := filepath.Join(t.TempDir(), "world-color.png")
+	cmd := newCommand()
+	cmd.SetArgs([]string{
+		"olsson-cartographic-png",
+		"--output", outputPath,
+		"--seed", "42",
+		"--width", "10",
+		"--height", "5",
+		"--faults", "100",
+		"--ocean-percent", "25",
+		"--ice-percent", "15",
+	})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	img, err := png.Decode(bytes.NewReader(got))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if img.Bounds().Dx() != 10 || img.Bounds().Dy() != 5 {
+		t.Fatalf("image size = %dx%d, want 10x5", img.Bounds().Dx(), img.Bounds().Dy())
+	}
+
+	var want bytes.Buffer
+	rendererConfig := cartographicpng.DefaultConfig()
+	rendererConfig.OceanPercent = 25
+	rendererConfig.IcePercent = 15
+	if err := olssoncartographicpng.Run(&want, olsson.Config{
+		Source: rand.NewPCG(42, 0),
+		Width:  10,
+		Height: 5,
+		Faults: 100,
+	}, rendererConfig); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, want.Bytes()) {
+		t.Fatal("command flags did not produce the selected pipeline output")
+	}
+}
+
 func TestOlssonMonochromePNGCommandWritesSelectedArtifact(t *testing.T) {
 	outputPath := filepath.Join(t.TempDir(), "world.png")
 	cmd := newCommand()
@@ -144,5 +241,17 @@ func TestOlssonMonochromePNGCommandRequiresOutput(t *testing.T) {
 
 	if err := cmd.Execute(); err == nil {
 		t.Fatal("command succeeded without --output")
+	}
+}
+
+func TestCartographicPNGCommandsRequireOutput(t *testing.T) {
+	for _, name := range []string{"flat-cartographic-png", "olsson-cartographic-png"} {
+		t.Run(name, func(t *testing.T) {
+			cmd := newCommand()
+			cmd.SetArgs([]string{name})
+			if err := cmd.Execute(); err == nil {
+				t.Fatal("command succeeded without --output")
+			}
+		})
 	}
 }

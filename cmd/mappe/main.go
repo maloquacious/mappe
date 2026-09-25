@@ -18,14 +18,18 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"math/rand/v2"
 	"os"
 
 	"github.com/maloquacious/mappe"
 	"github.com/maloquacious/mappe/internal/generators/flat"
 	"github.com/maloquacious/mappe/olsson"
+	"github.com/maloquacious/mappe/pipelines/flatcartographicpng"
 	"github.com/maloquacious/mappe/pipelines/flatmonochromepng"
+	"github.com/maloquacious/mappe/pipelines/olssoncartographicpng"
 	"github.com/maloquacious/mappe/pipelines/olssonmonochromepng"
+	"github.com/maloquacious/mappe/renderers/cartographicpng"
 	"github.com/spf13/cobra"
 )
 
@@ -44,7 +48,9 @@ func newCommand() *cobra.Command {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 	}
+	cmd.AddCommand(newFlatCartographicPNGCommand())
 	cmd.AddCommand(newFlatMonochromePNGCommand())
+	cmd.AddCommand(newOlssonCartographicPNGCommand())
 	cmd.AddCommand(newOlssonMonochromePNGCommand())
 	cmd.AddCommand(&cobra.Command{
 		Use:   "version",
@@ -55,6 +61,43 @@ func newCommand() *cobra.Command {
 		},
 	})
 	return cmd
+}
+
+func newFlatCartographicPNGCommand() *cobra.Command {
+	seed := int64(42)
+	outputPath := ""
+	generatorConfig := flat.Config{
+		Width:      640,
+		Height:     320,
+		Iterations: 100,
+	}
+	rendererConfig := cartographicpng.DefaultConfig()
+
+	cmd := &cobra.Command{
+		Use:   "flat-cartographic-png",
+		Short: "Run the flat generator and cartographic PNG renderer",
+		Args:  cobra.NoArgs,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			generatorConfig.Source = rand.NewPCG(uint64(seed), 0)
+			return writeFlatCartographicPNG(outputPath, generatorConfig, rendererConfig)
+		},
+	}
+	cmd.Flags().Int64Var(&seed, "seed", seed, "pseudorandom seed")
+	cmd.Flags().IntVar(&generatorConfig.Width, "width", generatorConfig.Width, "map width")
+	cmd.Flags().IntVar(&generatorConfig.Height, "height", generatorConfig.Height, "map height")
+	cmd.Flags().IntVar(&generatorConfig.Iterations, "iterations", generatorConfig.Iterations, "number of circular fractures")
+	cmd.Flags().BoolVar(&generatorConfig.Wrap, "wrap", generatorConfig.Wrap, "wrap circles across both map axes")
+	cmd.Flags().IntVar(&rendererConfig.OceanPercent, "ocean-percent", rendererConfig.OceanPercent, "percentage of map allocated to ocean")
+	cmd.Flags().IntVar(&rendererConfig.IcePercent, "ice-percent", rendererConfig.IcePercent, "percentage of map allocated to ice")
+	cmd.Flags().StringVarP(&outputPath, "output", "o", outputPath, "PNG output path")
+	_ = cmd.MarkFlagRequired("output")
+	return cmd
+}
+
+func writeFlatCartographicPNG(path string, generatorConfig flat.Config, rendererConfig cartographicpng.Config) error {
+	return writePNG(path, func(output io.Writer) error {
+		return flatcartographicpng.Run(output, generatorConfig, rendererConfig)
+	})
 }
 
 func newFlatMonochromePNGCommand() *cobra.Command {
@@ -86,18 +129,45 @@ func newFlatMonochromePNGCommand() *cobra.Command {
 }
 
 func writeFlatMonochromePNG(path string, cfg flat.Config) error {
-	output, err := os.Create(path)
-	if err != nil {
-		return fmt.Errorf("create output: %w", err)
+	return writePNG(path, func(output io.Writer) error {
+		return flatmonochromepng.Run(output, cfg)
+	})
+}
+
+func newOlssonCartographicPNGCommand() *cobra.Command {
+	seed := int64(0x638bb317ac47a6ba)
+	outputPath := ""
+	generatorConfig := olsson.Config{
+		Width:  640,
+		Height: 320,
+		Faults: 100,
 	}
-	if err := flatmonochromepng.Run(output, cfg); err != nil {
-		_ = output.Close()
-		return err
+	rendererConfig := cartographicpng.DefaultConfig()
+
+	cmd := &cobra.Command{
+		Use:   "olsson-cartographic-png",
+		Short: "Run the Olsson generator and cartographic PNG renderer",
+		Args:  cobra.NoArgs,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			generatorConfig.Source = rand.NewPCG(uint64(seed), 0)
+			return writeOlssonCartographicPNG(outputPath, generatorConfig, rendererConfig)
+		},
 	}
-	if err := output.Close(); err != nil {
-		return fmt.Errorf("close output: %w", err)
-	}
-	return nil
+	cmd.Flags().Int64Var(&seed, "seed", seed, "pseudorandom seed")
+	cmd.Flags().IntVar(&generatorConfig.Width, "width", generatorConfig.Width, "map width (must be twice height)")
+	cmd.Flags().IntVar(&generatorConfig.Height, "height", generatorConfig.Height, "map height")
+	cmd.Flags().IntVar(&generatorConfig.Faults, "faults", generatorConfig.Faults, "number of faults")
+	cmd.Flags().IntVar(&rendererConfig.OceanPercent, "ocean-percent", rendererConfig.OceanPercent, "percentage of map allocated to ocean")
+	cmd.Flags().IntVar(&rendererConfig.IcePercent, "ice-percent", rendererConfig.IcePercent, "percentage of map allocated to ice")
+	cmd.Flags().StringVarP(&outputPath, "output", "o", outputPath, "PNG output path")
+	_ = cmd.MarkFlagRequired("output")
+	return cmd
+}
+
+func writeOlssonCartographicPNG(path string, generatorConfig olsson.Config, rendererConfig cartographicpng.Config) error {
+	return writePNG(path, func(output io.Writer) error {
+		return olssoncartographicpng.Run(output, generatorConfig, rendererConfig)
+	})
 }
 
 func newOlssonMonochromePNGCommand() *cobra.Command {
@@ -128,11 +198,17 @@ func newOlssonMonochromePNGCommand() *cobra.Command {
 }
 
 func writeOlssonMonochromePNG(path string, cfg olsson.Config) error {
+	return writePNG(path, func(output io.Writer) error {
+		return olssonmonochromepng.Run(output, cfg)
+	})
+}
+
+func writePNG(path string, run func(io.Writer) error) error {
 	output, err := os.Create(path)
 	if err != nil {
 		return fmt.Errorf("create output: %w", err)
 	}
-	if err := olssonmonochromepng.Run(output, cfg); err != nil {
+	if err := run(output); err != nil {
 		_ = output.Close()
 		return err
 	}
