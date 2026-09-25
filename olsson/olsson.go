@@ -49,11 +49,11 @@ type Config struct {
 	Faults int
 }
 
-// Map is an equirectangular height map.
+// Map is an equirectangular height map with elevations normalized to [0, 1].
 type Map struct {
 	width      int
 	height     int
-	elevations []int
+	elevations []float64
 }
 
 // Width returns the number of columns in the map.
@@ -64,7 +64,7 @@ func (m *Map) Height() int { return m.height }
 
 // Elevation returns the generated elevation at (x, y). It panics when either
 // coordinate is outside the map.
-func (m *Map) Elevation(x, y int) int {
+func (m *Map) Elevation(x, y int) float64 {
 	if x < 0 || x >= m.width || y < 0 || y >= m.height {
 		panic("olsson: coordinates outside map")
 	}
@@ -73,14 +73,28 @@ func (m *Map) Elevation(x, y int) int {
 
 // Elevations returns the map's elevations in row-major order. The returned
 // slice is a copy and may be modified by the caller.
-func (m *Map) Elevations() []int {
-	elevations := make([]int, len(m.elevations))
+func (m *Map) Elevations() []float64 {
+	elevations := make([]float64, len(m.elevations))
 	copy(elevations, m.elevations)
 	return elevations
 }
 
-// Generate creates a deterministic height map from cfg.
+// Generate creates a deterministic height map from cfg. Non-flat maps span
+// the full [0, 1] elevation range. Flat maps contain only zero elevations.
 func Generate(cfg Config) (*Map, error) {
+	elevations, err := generateRaw(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Map{
+		width:      cfg.Width,
+		height:     cfg.Height,
+		elevations: normalize(elevations),
+	}, nil
+}
+
+func generateRaw(cfg Config) ([]int, error) {
 	if cfg.Source == nil {
 		return nil, ErrNilSource
 	}
@@ -133,11 +147,29 @@ func Generate(cfg Config) (*Map, error) {
 		}
 	}
 
-	return &Map{
-		width:      cfg.Width,
-		height:     cfg.Height,
-		elevations: elevations,
-	}, nil
+	return elevations, nil
+}
+
+func normalize(elevations []int) []float64 {
+	normalized := make([]float64, len(elevations))
+	minimum, maximum := elevations[0], elevations[0]
+	for _, elevation := range elevations[1:] {
+		if elevation < minimum {
+			minimum = elevation
+		}
+		if elevation > maximum {
+			maximum = elevation
+		}
+	}
+	if minimum == maximum {
+		return normalized
+	}
+
+	span := float64(maximum) - float64(minimum)
+	for i, elevation := range elevations {
+		normalized[i] = (float64(elevation) - float64(minimum)) / span
+	}
+	return normalized
 }
 
 func generateFault(rows [][]int, sinPhi []float64, rnd *rand.Rand, lower bool) {

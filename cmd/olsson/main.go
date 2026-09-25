@@ -28,11 +28,11 @@ import (
 )
 
 type output struct {
-	Seed       int64 `json:"seed"`
-	Width      int   `json:"width"`
-	Height     int   `json:"height"`
-	Faults     int   `json:"faults"`
-	Elevations []int `json:"elevations"`
+	Seed       int64     `json:"seed"`
+	Width      int       `json:"width"`
+	Height     int       `json:"height"`
+	Faults     int       `json:"faults"`
+	Elevations []float64 `json:"elevations"`
 }
 
 func main() {

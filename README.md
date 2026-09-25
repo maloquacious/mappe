@@ -62,8 +62,10 @@ generator migrated from [`mdhender/worldgen`](https://github.com/mdhender/worldg
 That repository preserved and ported John Olsson's original C world-map
 generator. The migration retains its equirectangular map construction while
 accepting a caller-owned `math/rand/v2` source in place of process-global
-randomness. The source commands, rendering, projections, and unrelated
-experimental generators remain intentionally omitted.
+randomness. Generated elevations are normalized `float64` values in the
+inclusive range `[0,1]`; a flat map contains only zero elevations. The source
+commands, rendering, projections, and unrelated experimental generators remain
+intentionally omitted.
 
 ```go
 world, err := olsson.Generate(olsson.Config{
@@ -74,7 +76,7 @@ world, err := olsson.Generate(olsson.Config{
 })
 ```
 
-Generate the same raw height-map data as JSON with the command-line adapter:
+Generate the normalized height-map data as JSON with the command-line adapter:
 
 ```sh
 go run ./cmd/olsson -seed 42 > world.json
