@@ -53,11 +53,13 @@ type Config struct {
 	IcePalette   []color.RGBA
 }
 
-// DefaultConfig returns the source renderer's 55 percent ocean, 8 percent ice,
-// and built-in palettes. Land receives the remaining 37 percent.
+// DefaultConfig returns 48 percent ocean, the source renderer's 8 percent ice,
+// and built-in palettes. Land receives the remaining 44 percent. The ocean
+// share departs from the source renderer's 55 percent so --ocean-percent has
+// the same default in every Mappe pipeline.
 func DefaultConfig() Config {
 	return Config{
-		OceanPercent: 55,
+		OceanPercent: 48,
 		IcePercent:   8,
 		OceanPalette: defaultOceanPalette(),
 		LandPalette:  defaultLandPalette(),

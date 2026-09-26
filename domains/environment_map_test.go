@@ -26,7 +26,7 @@ func TestEnvironmentalMapUsesCartesianTopologyAtEdges(t *testing.T) {
 			if tt.waterY {
 				samples[2*3+0].Elevation = 0.4 // north of (0, 0) only when north-south wraps
 			}
-			m, err := NewEnvironmentalMap(3, 3, tt.topology, samples, DefaultClassificationConfig())
+			m, err := NewEnvironmentalMap(3, 3, tt.topology, samples, testLevels(t), DefaultClassificationConfig())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -43,7 +43,7 @@ func TestEnvironmentalMapUsesCartesianTopologyAtEdges(t *testing.T) {
 func TestEnvironmentalMapIsRowMajorAndDefensivelyCopied(t *testing.T) {
 	samples := repeatedSamples(2, 2, ordinarySample())
 	samples[2].Heat = 0.9
-	m, err := NewEnvironmentalMap(2, 2, GridTopology{}, samples, DefaultClassificationConfig())
+	m, err := NewEnvironmentalMap(2, 2, GridTopology{}, samples, testLevels(t), DefaultClassificationConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,22 +66,26 @@ func TestNewEnvironmentalMapRejectsInvalidInput(t *testing.T) {
 	badConfig := DefaultClassificationConfig()
 	badConfig.Heat.Cold = badConfig.Heat.Polar
 
+	levels := testLevels(t)
+
 	for _, tt := range []struct {
 		name    string
 		width   int
 		height  int
 		samples []EnvironmentalSample
+		levels  *ElevationLevels
 		cfg     ClassificationConfig
 		want    error
 	}{
-		{name: "width", height: 1, cfg: DefaultClassificationConfig(), want: ErrInvalidWidth},
-		{name: "height", width: 1, cfg: DefaultClassificationConfig(), want: ErrInvalidHeight},
-		{name: "count", width: 2, height: 1, samples: []EnvironmentalSample{valid}, cfg: DefaultClassificationConfig(), want: ErrInvalidEnvironmentalSampleCount},
-		{name: "sample", width: 1, height: 1, samples: []EnvironmentalSample{badSample}, cfg: DefaultClassificationConfig(), want: ErrInvalidEnvironmentalSample},
-		{name: "config", width: 1, height: 1, samples: []EnvironmentalSample{valid}, cfg: badConfig, want: ErrInvalidClassificationConfig},
+		{name: "width", height: 1, levels: levels, cfg: DefaultClassificationConfig(), want: ErrInvalidWidth},
+		{name: "height", width: 1, levels: levels, cfg: DefaultClassificationConfig(), want: ErrInvalidHeight},
+		{name: "count", width: 2, height: 1, samples: []EnvironmentalSample{valid}, levels: levels, cfg: DefaultClassificationConfig(), want: ErrInvalidEnvironmentalSampleCount},
+		{name: "levels", width: 1, height: 1, samples: []EnvironmentalSample{valid}, cfg: DefaultClassificationConfig(), want: ErrNilElevationLevels},
+		{name: "sample", width: 1, height: 1, samples: []EnvironmentalSample{badSample}, levels: levels, cfg: DefaultClassificationConfig(), want: ErrInvalidEnvironmentalSample},
+		{name: "config", width: 1, height: 1, samples: []EnvironmentalSample{valid}, levels: levels, cfg: badConfig, want: ErrInvalidClassificationConfig},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			if _, err := NewEnvironmentalMap(tt.width, tt.height, GridTopology{}, tt.samples, tt.cfg); err != tt.want {
+			if _, err := NewEnvironmentalMap(tt.width, tt.height, GridTopology{}, tt.samples, tt.levels, tt.cfg); err != tt.want {
 				t.Fatalf("NewEnvironmentalMap error = %v, want %v", err, tt.want)
 			}
 		})
@@ -89,7 +93,7 @@ func TestNewEnvironmentalMapRejectsInvalidInput(t *testing.T) {
 }
 
 func TestEnvironmentalMapCellPanicsOutsideMap(t *testing.T) {
-	m, err := NewEnvironmentalMap(1, 1, GridTopology{}, []EnvironmentalSample{ordinarySample()}, DefaultClassificationConfig())
+	m, err := NewEnvironmentalMap(1, 1, GridTopology{}, []EnvironmentalSample{ordinarySample()}, testLevels(t), DefaultClassificationConfig())
 	if err != nil {
 		t.Fatal(err)
 	}

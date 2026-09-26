@@ -134,35 +134,33 @@ func (t Terrain) IsWater() bool {
 	}
 }
 
-// TerrainThresholds contains the normalized thresholds used by the ordered
-// terrain and biome classifier.
+// TerrainThresholds contains the normalized non-elevation thresholds used by
+// the ordered terrain and biome classifier. Ocean depth, the volcanic
+// elevation floor, and the wetland elevation ceiling come from
+// ElevationLevels.
 type TerrainThresholds struct {
-	DeepOceanDepth            float64
-	OceanDepth                float64
 	IceHeat                   float64
 	AlpineHeat                float64
-	VolcanicElevation         float64
 	VolcanoThreshold          float64
 	VolcanoRelief             float64
 	VolcanicHighlandThreshold float64
 	HillsRelief               float64
 	WetlandWetness            float64
-	WetlandElevation          float64
 	WetlandRelief             float64
 	BogHeat                   float64
 	SwampHeat                 float64
 	BadlandsRelief            float64
 }
 
-func classifyTerrain(sample EnvironmentalSample, elevationBand ElevationBand, heatBand HeatBand, wetness float64, wetnessBand MoistureBand, landNeighbor, waterNeighbor bool, cfg ClassificationConfig) Terrain {
+func classifyTerrain(sample EnvironmentalSample, elevationBand ElevationBand, heatBand HeatBand, wetness float64, wetnessBand MoistureBand, landNeighbor, waterNeighbor bool, levels ElevationLevelValues, cfg ClassificationConfig) Terrain {
 	t := cfg.Terrain
-	if sample.Elevation <= cfg.Elevation.SeaLevel {
+	if sample.Elevation <= levels.SeaLevel {
 		switch {
 		case landNeighbor:
 			return TerrainCoastalWater
-		case sample.Elevation <= t.DeepOceanDepth:
+		case sample.Elevation <= levels.Abyss:
 			return TerrainDeepOcean
-		case sample.Elevation <= t.OceanDepth:
+		case sample.Elevation <= levels.Shelf:
 			return TerrainOcean
 		default:
 			return TerrainShallowSea
@@ -171,7 +169,9 @@ func classifyTerrain(sample EnvironmentalSample, elevationBand ElevationBand, he
 	if sample.Heat <= t.IceHeat {
 		return TerrainGlacialIce
 	}
-	if sample.Elevation >= t.VolcanicElevation {
+	// Until volcanism is placed as sites (#20), the highland level is the
+	// volcanic elevation floor.
+	if sample.Elevation >= levels.Highland {
 		switch {
 		case sample.Volcanic >= t.VolcanoThreshold && sample.Relief >= t.VolcanoRelief:
 			return TerrainVolcano
@@ -188,7 +188,7 @@ func classifyTerrain(sample EnvironmentalSample, elevationBand ElevationBand, he
 	if elevationBand == ElevationHighland || sample.Relief >= t.HillsRelief {
 		return TerrainHills
 	}
-	if wetness >= t.WetlandWetness && sample.Elevation <= t.WetlandElevation && sample.Relief <= t.WetlandRelief {
+	if wetness >= t.WetlandWetness && elevationBand == ElevationLowland && sample.Relief <= t.WetlandRelief {
 		switch {
 		case sample.Heat <= t.BogHeat:
 			return TerrainBog

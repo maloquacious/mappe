@@ -5,20 +5,22 @@ import (
 	"errors"
 	"image/png"
 	"io"
+	"math"
 	"math/rand/v2"
 	"testing"
 
 	"github.com/maloquacious/mappe/domains"
 	"github.com/maloquacious/mappe/internal/generators/flat"
+	"github.com/maloquacious/mappe/internal/levels/percentile"
 	"github.com/maloquacious/mappe/renderers/terrainpng"
 )
 
 func TestRunProducesDeterministicTerrainPNG(t *testing.T) {
 	var first, second bytes.Buffer
-	if err := Run(&first, testConfig(42), domains.DefaultClassificationConfig()); err != nil {
+	if err := Run(&first, testConfig(42), percentile.DefaultConfig(), domains.DefaultClassificationConfig()); err != nil {
 		t.Fatal(err)
 	}
-	if err := Run(&second, testConfig(42), domains.DefaultClassificationConfig()); err != nil {
+	if err := Run(&second, testConfig(42), percentile.DefaultConfig(), domains.DefaultClassificationConfig()); err != nil {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(first.Bytes(), second.Bytes()) {
@@ -38,7 +40,11 @@ func TestDiagnosticFieldsAreNormalizedAndUseHeightTopology(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	environmentalMap, err := classify(heightField, domains.DefaultClassificationConfig())
+	levels, err := percentile.Derive(heightField, percentile.DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	environmentalMap, err := classify(heightField, levels, domains.DefaultClassificationConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +78,11 @@ func TestDiagnosticFieldsAreContinuousAcrossWrappedSeams(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	environmentalMap, err := classify(heightField, domains.DefaultClassificationConfig())
+	levels, err := domains.NewElevationLevels(domains.ElevationLevelValues{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	environmentalMap, err := classify(heightField, levels, domains.DefaultClassificationConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,20 +95,84 @@ func TestDiagnosticFieldsAreContinuousAcrossWrappedSeams(t *testing.T) {
 	}
 }
 
+func TestClassifiedWaterMatchesRequestedOceanShare(t *testing.T) {
+	heightField, err := flat.GenerateHeightField(flat.Config{
+		Source: rand.NewPCG(42, 0), Width: 128, Height: 64, Iterations: 1000, Wrap: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, oceanPercent := range []int{25, 48, 70} {
+		levelsConfig := percentile.DefaultConfig()
+		levelsConfig.OceanPercent = oceanPercent
+		levels, err := percentile.Derive(heightField, levelsConfig)
+		if err != nil {
+			t.Fatal(err)
+		}
+		environmentalMap, err := classify(heightField, levels, domains.DefaultClassificationConfig())
+		if err != nil {
+			t.Fatal(err)
+		}
+		water := 0
+		for _, cell := range environmentalMap.Cells() {
+			if cell.Terrain.IsWater() {
+				water++
+			}
+		}
+		composition := levels.Composition(heightField)
+		if water != composition.WaterTiles() {
+			t.Fatalf("ocean %d%%: water terrain tiles = %d, want %d", oceanPercent, water, composition.WaterTiles())
+		}
+		// The requested share is a minimum, and only tiles tied at sea level
+		// may carry the achieved share above it.
+		requested := (composition.Tiles*oceanPercent + 99) / 100
+		atSeaLevel := 0
+		for _, elevation := range heightField.Elevations() {
+			if elevation == levels.Values().SeaLevel {
+				atSeaLevel++
+			}
+		}
+		if water < requested || water-atSeaLevel >= requested {
+			t.Fatalf("ocean %d%%: water tiles = %d with %d at sea level, want the fewest tied tiles reaching %d", oceanPercent, water, atSeaLevel, requested)
+		}
+	}
+}
+
+func TestRiseAboveSeaIsMeasuredFromDerivedSeaLevel(t *testing.T) {
+	for _, tt := range []struct {
+		elevation, seaLevel, mountain, want float64
+	}{
+		{elevation: 0.2, seaLevel: 0.3, mountain: 0.8, want: 0},
+		{elevation: 0.3, seaLevel: 0.3, mountain: 0.8, want: 0},
+		{elevation: 0.55, seaLevel: 0.3, mountain: 0.8, want: 0.5},
+		{elevation: 0.8, seaLevel: 0.3, mountain: 0.8, want: 1},
+		{elevation: 1, seaLevel: 0.3, mountain: 0.8, want: 1.4},
+	} {
+		if got := riseAboveSea(tt.elevation, tt.seaLevel, tt.mountain); math.Abs(got-tt.want) > 1e-12 {
+			t.Errorf("riseAboveSea(%v, %v, %v) = %v, want %v", tt.elevation, tt.seaLevel, tt.mountain, got, tt.want)
+		}
+	}
+}
+
 func TestRunIdentifiesFailingStage(t *testing.T) {
-	if err := Run(&bytes.Buffer{}, flat.Config{}, domains.DefaultClassificationConfig()); !errors.Is(err, flat.ErrNilSource) {
+	if err := Run(&bytes.Buffer{}, flat.Config{}, percentile.DefaultConfig(), domains.DefaultClassificationConfig()); !errors.Is(err, flat.ErrNilSource) {
 		t.Fatalf("generator error = %v, want error wrapping %v", err, flat.ErrNilSource)
+	}
+	badLevels := percentile.DefaultConfig()
+	badLevels.OceanPercent = 101
+	if err := Run(&bytes.Buffer{}, testConfig(42), badLevels, domains.DefaultClassificationConfig()); !errors.Is(err, percentile.ErrInvalidOceanPercent) {
+		t.Fatalf("levels error = %v, want error wrapping %v", err, percentile.ErrInvalidOceanPercent)
 	}
 	badConfig := domains.DefaultClassificationConfig()
 	badConfig.Heat.Cold = badConfig.Heat.Polar
-	if err := Run(&bytes.Buffer{}, testConfig(42), badConfig); !errors.Is(err, domains.ErrInvalidClassificationConfig) {
+	if err := Run(&bytes.Buffer{}, testConfig(42), percentile.DefaultConfig(), badConfig); !errors.Is(err, domains.ErrInvalidClassificationConfig) {
 		t.Fatalf("classification error = %v, want error wrapping %v", err, domains.ErrInvalidClassificationConfig)
 	}
 	want := errors.New("write failed")
-	if err := Run(errorWriter{err: want}, testConfig(42), domains.DefaultClassificationConfig()); !errors.Is(err, want) {
+	if err := Run(errorWriter{err: want}, testConfig(42), percentile.DefaultConfig(), domains.DefaultClassificationConfig()); !errors.Is(err, want) {
 		t.Fatalf("renderer error = %v, want error wrapping %v", err, want)
 	}
-	if err := Run(nil, testConfig(42), domains.DefaultClassificationConfig()); !errors.Is(err, terrainpng.ErrNilWriter) {
+	if err := Run(nil, testConfig(42), percentile.DefaultConfig(), domains.DefaultClassificationConfig()); !errors.Is(err, terrainpng.ErrNilWriter) {
 		t.Fatalf("nil writer error = %v, want error wrapping %v", err, terrainpng.ErrNilWriter)
 	}
 }

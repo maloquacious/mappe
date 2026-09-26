@@ -14,8 +14,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-// Package flatterrainpng composes the flat generator with deterministic
-// diagnostic environmental fields and the terrain PNG renderer.
+// Package flatterrainpng composes the flat generator, percentile elevation
+// levels, deterministic diagnostic environmental fields, and the terrain PNG
+// renderer.
 package flatterrainpng
 
 import (
@@ -25,18 +26,28 @@ import (
 
 	"github.com/maloquacious/mappe/domains"
 	"github.com/maloquacious/mappe/internal/generators/flat"
+	"github.com/maloquacious/mappe/internal/levels/percentile"
 	"github.com/maloquacious/mappe/renderers/terrainpng"
 )
 
-// Run generates a flat height field, derives deterministic periodic
-// environmental samples, classifies their terrain, and writes a PNG to w. The
-// environmental fields are diagnostic rather than a climatological model.
-func Run(w io.Writer, generatorConfig flat.Config, classificationConfig domains.ClassificationConfig) error {
+// mountainCooling is the heat removed at the mountain level. Cooling grows
+// linearly with height above sea level and continues above the mountain level.
+const mountainCooling = 0.1875
+
+// Run generates a flat height field, derives its elevation levels from tile
+// percentages, derives deterministic periodic environmental samples, classifies
+// their terrain, and writes a PNG to w. The environmental fields are diagnostic
+// rather than a climatological model.
+func Run(w io.Writer, generatorConfig flat.Config, levelsConfig percentile.Config, classificationConfig domains.ClassificationConfig) error {
 	heightField, err := flat.GenerateHeightField(generatorConfig)
 	if err != nil {
 		return fmt.Errorf("flat-terrain-png: generate height field: %w", err)
 	}
-	environmentalMap, err := classify(heightField, classificationConfig)
+	levels, err := percentile.Derive(heightField, levelsConfig)
+	if err != nil {
+		return fmt.Errorf("flat-terrain-png: derive elevation levels: %w", err)
+	}
+	environmentalMap, err := classify(heightField, levels, classificationConfig)
 	if err != nil {
 		return fmt.Errorf("flat-terrain-png: classify environment: %w", err)
 	}
@@ -46,8 +57,9 @@ func Run(w io.Writer, generatorConfig flat.Config, classificationConfig domains.
 	return nil
 }
 
-func classify(heightField *domains.HeightField, cfg domains.ClassificationConfig) (*domains.EnvironmentalMap, error) {
+func classify(heightField *domains.HeightField, levels *domains.ElevationLevels, cfg domains.ClassificationConfig) (*domains.EnvironmentalMap, error) {
 	width, height := heightField.Width(), heightField.Height()
+	seaLevel, mountain := levels.Values().SeaLevel, levels.Values().Mountain
 	samples := make([]domains.EnvironmentalSample, width*height)
 	for y := 0; y < height; y++ {
 		phaseY := 2 * math.Pi * float64(y) / float64(height)
@@ -55,7 +67,7 @@ func classify(heightField *domains.HeightField, cfg domains.ClassificationConfig
 			phaseX := 2 * math.Pi * float64(x) / float64(width)
 			elevation := heightField.Elevation(x, y)
 			heat := 0.5 + 0.3*math.Sin(phaseY) + 0.2*math.Cos(phaseX+phaseY)
-			heat -= 0.25 * max(0, 2*(elevation-0.5))
+			heat -= mountainCooling * riseAboveSea(elevation, seaLevel, mountain)
 			samples[y*width+x] = domains.EnvironmentalSample{
 				Elevation: elevation,
 				Heat:      clampNormalized(heat),
@@ -66,7 +78,19 @@ func classify(heightField *domains.HeightField, cfg domains.ClassificationConfig
 			}
 		}
 	}
-	return domains.NewEnvironmentalMap(width, height, heightField.Topology(), samples, cfg)
+	return domains.NewEnvironmentalMap(width, height, heightField.Topology(), samples, levels, cfg)
+}
+
+// riseAboveSea returns height above sea level in units of the mountain level's
+// height above sea level: 0 at or below the shore and 1 at the mountain level.
+func riseAboveSea(elevation, seaLevel, mountain float64) float64 {
+	if elevation <= seaLevel {
+		return 0
+	}
+	if mountain <= seaLevel {
+		return 1
+	}
+	return (elevation - seaLevel) / (mountain - seaLevel)
 }
 
 func reliefAt(heightField *domains.HeightField, x, y int) float64 {

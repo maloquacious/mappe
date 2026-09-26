@@ -93,6 +93,9 @@ func TestColorMapSamplesPalettesDiscretely(t *testing.T) {
 func TestConstantMapUsesWholeBinAndSmallTargetsTruncate(t *testing.T) {
 	histogram := [256]int{2}
 	cfg := DefaultConfig()
+	// 55 percent of two pixels truncates to one, so the whole two-pixel bin
+	// goes to ocean; 55 percent of one pixel truncates to none.
+	cfg.OceanPercent = 55
 	colors := colorMap(histogram, cfg)
 	if got, want := colors[0], cfg.OceanPalette[0]; got != want {
 		t.Fatalf("two-pixel constant map color = %v, want ocean %v", got, want)

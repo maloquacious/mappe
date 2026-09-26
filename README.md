@@ -68,8 +68,13 @@ coast, and climate-cover rules. Inland sea and lake retain their stable IDs but
 are not yet produced.
 
 The source model's signed physical values are mapped linearly onto Mappe's
-normalized `[0,1]` convention: `0.5` is sea level and the neutral value for
-heat, moisture, basin, and volcanic tendency. `GridTopology` independently
+normalized `[0,1]` convention, where `0.5` is the neutral value for heat,
+moisture, basin, and volcanic tendency. Sea level is not fixed: generators
+stretch each height map to fill `[0,1]`, so `0.5` has no stable meaning as an
+elevation. Instead, `ElevationLevels` holds the absolute elevations of sea
+level, the continental shelf, the abyss, and the upland, highland, and mountain
+bands for one height field. Any stage may produce it, and classification reads
+its water, depth, and elevation bands from it. `GridTopology` independently
 records east-west and north-south wrapping so neighbor-based classification is
 correct at each Cartesian edge. The source hex coordinates, unbounded field
 generation, rim, commands, renderers, and palettes remain intentionally
@@ -145,17 +150,30 @@ and intermediate elevations are rounded to the nearest grayscale value.
 Package `renderers/cartographicpng` translates the same domain into an opaque
 land, ocean, and ice PNG using the histogram-derived bands and discrete color
 palettes preserved from `mdhender/worldgen` and John Olsson's generator. The
-default configuration allocates 55 percent of pixels to ocean, 8 percent to
-ice, and the remainder to land. Whole elevation bins are never split, so the
+default configuration allocates 48 percent of pixels to ocean, 8 percent to
+ice, and the remainder to land. The ocean default deliberately departs from the
+source renderer's 55 percent so `--ocean-percent` defaults to 48 in every Mappe
+pipeline. Whole elevation bins are never split, so the
 actual proportions may cross those targets at a boundary.
 
 Package `renderers/terrainpng` translates a `domains.EnvironmentalMap` into an
 opaque categorical PNG with one color per terrain value. The
 `flat-terrain-png` diagnostic pipeline exercises that renderer and the full
-Cartesian classifier. It derives deterministic periodic heat, moisture, basin,
-volcanic, and local-relief fields around the flat generator's elevation output.
-Those fields are intended to expose classification and topology behavior; they
-are not a climatological model.
+Cartesian classifier. It derives elevation levels with the percentile stage,
+then deterministic periodic heat, moisture, basin, volcanic, and local-relief
+fields around the flat generator's elevation output. Those fields are intended
+to expose classification and topology behavior; they are not a climatological
+model.
+
+The percentile stage (`internal/levels/percentile`) treats one pixel as one
+tile and derives every level by checking a tile percentage against the
+elevation histogram. By default 48 percent of tiles are ocean. Land is 50
+percent lowland, 30 percent upland, 13 percent highland, and 7 percent
+mountain; ocean is 15 percent shallow sea, 45 percent ocean, and 40 percent
+deep ocean. Each percentage is a minimum: tiles that share an elevation stay on
+the same side of a level, so the achieved share can exceed the request.
+`ElevationLevels.Composition` reports the achieved shares. Only the ocean
+percentage is exposed as `--ocean-percent`.
 
 The named `olsson-monochrome-png` pipeline composes the `olsson` generator with
 that renderer. Run it through the Cobra-based `mappe` command:
@@ -193,7 +211,7 @@ go run ./cmd/mappe olsson-cartographic-png \
   --width 640 \
   --height 320 \
   --faults 100 \
-  --ocean-percent 55 \
+  --ocean-percent 48 \
   --ice-percent 8 \
   --output world-color.png
 
@@ -203,7 +221,7 @@ go run ./cmd/mappe flat-cartographic-png \
   --height 320 \
   --iterations 10000 \
   --wrap \
-  --ocean-percent 55 \
+  --ocean-percent 48 \
   --ice-percent 8 \
   --output flat-color.png
 ```
@@ -217,6 +235,7 @@ go run ./cmd/mappe flat-terrain-png \
   --height 320 \
   --iterations 10000 \
   --wrap \
+  --ocean-percent 48 \
   --output flat-terrain.png
 ```
 

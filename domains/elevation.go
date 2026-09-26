@@ -59,32 +59,3 @@ func (e ElevationBand) Valid() bool { return e <= ElevationMountain }
 func (e ElevationBand) IsWater() bool {
 	return e == ElevationDeepWater || e == ElevationShallowWater
 }
-
-// ElevationThresholds divide normalized elevation into six bands. SeaLevel is
-// the inclusive top of shallow water; Upland, Highland, and Mountain are the
-// lower boundaries of their respective land bands.
-type ElevationThresholds struct {
-	DeepWater float64
-	SeaLevel  float64
-	Upland    float64
-	Highland  float64
-	Mountain  float64
-}
-
-// Classify returns the band containing normalized elevation.
-func (t ElevationThresholds) Classify(elevation float64) ElevationBand {
-	switch {
-	case elevation <= t.DeepWater:
-		return ElevationDeepWater
-	case elevation <= t.SeaLevel:
-		return ElevationShallowWater
-	case elevation < t.Upland:
-		return ElevationLowland
-	case elevation < t.Highland:
-		return ElevationUpland
-	case elevation < t.Mountain:
-		return ElevationHighland
-	default:
-		return ElevationMountain
-	}
-}

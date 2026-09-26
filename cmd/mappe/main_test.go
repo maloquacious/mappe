@@ -11,6 +11,7 @@ import (
 	"github.com/maloquacious/mappe"
 	"github.com/maloquacious/mappe/domains"
 	"github.com/maloquacious/mappe/internal/generators/flat"
+	"github.com/maloquacious/mappe/internal/levels/percentile"
 	"github.com/maloquacious/mappe/olsson"
 	"github.com/maloquacious/mappe/pipelines/flatcartographicpng"
 	"github.com/maloquacious/mappe/pipelines/flatmonochromepng"
@@ -153,6 +154,7 @@ func TestFlatTerrainPNGCommandWritesSelectedArtifact(t *testing.T) {
 		"--height", "16",
 		"--iterations", "100",
 		"--wrap",
+		"--ocean-percent", "30",
 	})
 
 	if err := cmd.Execute(); err != nil {
@@ -171,13 +173,31 @@ func TestFlatTerrainPNGCommandWritesSelectedArtifact(t *testing.T) {
 	}
 
 	var want bytes.Buffer
+	levelsConfig := percentile.DefaultConfig()
+	levelsConfig.OceanPercent = 30
 	if err := flatterrainpng.Run(&want, flat.Config{
 		Source: rand.NewPCG(42, 0), Width: 32, Height: 16, Iterations: 100, Wrap: true,
-	}, domains.DefaultClassificationConfig()); err != nil {
+	}, levelsConfig, domains.DefaultClassificationConfig()); err != nil {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(got, want.Bytes()) {
 		t.Fatal("command flags did not produce the selected pipeline output")
+	}
+}
+
+func TestOceanPercentDefaultsTo48InEveryPipeline(t *testing.T) {
+	for _, name := range []string{"flat-cartographic-png", "flat-terrain-png", "olsson-cartographic-png"} {
+		cmd, _, err := newCommand().Find([]string{name})
+		if err != nil {
+			t.Fatal(err)
+		}
+		flag := cmd.Flags().Lookup("ocean-percent")
+		if flag == nil {
+			t.Fatalf("%s has no --ocean-percent flag", name)
+		}
+		if flag.DefValue != "48" {
+			t.Errorf("%s --ocean-percent default = %s, want 48", name, flag.DefValue)
+		}
 	}
 }
 

@@ -14,7 +14,7 @@ func TestRenderMapsTerrainToPixelsWithoutTransposingCoordinates(t *testing.T) {
 		sample(0.1, 0.5, 0.5), sample(0.55, 0.5, 0.5),
 		sample(0.55, 0.9, 0.1), sample(0.9, 0.5, 0.5),
 	}
-	environmentalMap, err := domains.NewEnvironmentalMap(2, 2, domains.GridTopology{}, samples, domains.DefaultClassificationConfig())
+	environmentalMap, err := domains.NewEnvironmentalMap(2, 2, domains.GridTopology{}, samples, testLevels(t), domains.DefaultClassificationConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +53,7 @@ func TestPaletteCoversEveryTerrainWithOpaqueColors(t *testing.T) {
 }
 
 func TestRenderRejectsNilInputs(t *testing.T) {
-	environmentalMap, err := domains.NewEnvironmentalMap(1, 1, domains.GridTopology{}, []domains.EnvironmentalSample{sample(0.55, 0.5, 0.5)}, domains.DefaultClassificationConfig())
+	environmentalMap, err := domains.NewEnvironmentalMap(1, 1, domains.GridTopology{}, []domains.EnvironmentalSample{sample(0.55, 0.5, 0.5)}, testLevels(t), domains.DefaultClassificationConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,4 +74,15 @@ func sample(elevation, heat, moisture float64) domains.EnvironmentalSample {
 		Basin:     0.5,
 		Volcanic:  0.5,
 	}
+}
+
+func testLevels(t *testing.T) *domains.ElevationLevels {
+	t.Helper()
+	levels, err := domains.NewElevationLevels(domains.ElevationLevelValues{
+		Abyss: 0.325, Shelf: 0.45, SeaLevel: 0.5, Upland: 0.625, Highland: 0.75, Mountain: 0.875,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return levels
 }

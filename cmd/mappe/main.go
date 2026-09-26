@@ -25,6 +25,7 @@ import (
 	"github.com/maloquacious/mappe"
 	"github.com/maloquacious/mappe/domains"
 	"github.com/maloquacious/mappe/internal/generators/flat"
+	"github.com/maloquacious/mappe/internal/levels/percentile"
 	"github.com/maloquacious/mappe/olsson"
 	"github.com/maloquacious/mappe/pipelines/flatcartographicpng"
 	"github.com/maloquacious/mappe/pipelines/flatmonochromepng"
@@ -145,6 +146,7 @@ func newFlatTerrainPNGCommand() *cobra.Command {
 		Height:     320,
 		Iterations: 10000,
 	}
+	levelsConfig := percentile.DefaultConfig()
 
 	cmd := &cobra.Command{
 		Use:   "flat-terrain-png",
@@ -152,7 +154,7 @@ func newFlatTerrainPNGCommand() *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			cfg.Source = rand.NewPCG(uint64(seed), 0)
-			return writeFlatTerrainPNG(outputPath, cfg)
+			return writeFlatTerrainPNG(outputPath, cfg, levelsConfig)
 		},
 	}
 	cmd.Flags().Int64Var(&seed, "seed", seed, "pseudorandom seed")
@@ -160,14 +162,15 @@ func newFlatTerrainPNGCommand() *cobra.Command {
 	cmd.Flags().IntVar(&cfg.Height, "height", cfg.Height, "map height")
 	cmd.Flags().IntVar(&cfg.Iterations, "iterations", cfg.Iterations, "number of circular fractures")
 	cmd.Flags().BoolVar(&cfg.Wrap, "wrap", cfg.Wrap, "wrap terrain and environmental fields across both map axes")
+	cmd.Flags().IntVar(&levelsConfig.OceanPercent, "ocean-percent", levelsConfig.OceanPercent, "percentage of map allocated to ocean")
 	cmd.Flags().StringVarP(&outputPath, "output", "o", outputPath, "PNG output path")
 	_ = cmd.MarkFlagRequired("output")
 	return cmd
 }
 
-func writeFlatTerrainPNG(path string, cfg flat.Config) error {
+func writeFlatTerrainPNG(path string, cfg flat.Config, levelsConfig percentile.Config) error {
 	return writePNG(path, func(output io.Writer) error {
-		return flatterrainpng.Run(output, cfg, domains.DefaultClassificationConfig())
+		return flatterrainpng.Run(output, cfg, levelsConfig, domains.DefaultClassificationConfig())
 	})
 }
 
