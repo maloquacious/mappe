@@ -29,11 +29,11 @@ import (
 // Run generates an Olsson normalized height map and writes it as a
 // cartographic PNG to w.
 func Run(w io.Writer, generatorConfig olsson.Config, rendererConfig cartographicpng.Config) error {
-	heightMap, err := olsson.GenerateNormalizedHeightMap(generatorConfig)
+	heightField, err := olsson.GenerateHeightField(generatorConfig)
 	if err != nil {
 		return fmt.Errorf("olsson-cartographic-png: generate height map: %w", err)
 	}
-	if err := cartographicpng.Render(w, heightMap, rendererConfig); err != nil {
+	if err := cartographicpng.Render(w, heightField.HeightMap(), rendererConfig); err != nil {
 		return fmt.Errorf("olsson-cartographic-png: render height map: %w", err)
 	}
 	return nil

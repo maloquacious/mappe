@@ -33,7 +33,7 @@ branch at the time of the survey.
 | --- | --- | --- | --- | --- |
 | [`maloquacious/mappe`](https://github.com/maloquacious/mappe) | Consolidated map and world generators | Destination repository; inventory phase | 2026-09-24 | — |
 | [`mdhender/wgvc`](https://github.com/mdhender/wgvc) | Province-first world maps with JSON, SVG, and PNG output | Active Go implementation | 2026-09-20 | [#1](https://github.com/maloquacious/mappe/issues/1) |
-| [`mdhender/wgva`](https://github.com/mdhender/wgva) | Deterministic, effectively unbounded procedural hex worlds | Active Go implementation | 2026-09-15 | [#2](https://github.com/maloquacious/mappe/issues/2) |
+| [`mdhender/wgva`](https://github.com/mdhender/wgva) | Deterministic, effectively unbounded procedural hex worlds | Partially included; terrain, climate, and biome domains migrated | 2026-09-15 | [#2](https://github.com/maloquacious/mappe/issues/2) |
 | [`mdhender/wgvb`](https://github.com/mdhender/wgvb) | Deterministic, effectively unbounded procedural hex worlds | Active Rust implementation; phases 1–7 reported complete | 2026-09-14 | [#3](https://github.com/maloquacious/mappe/issues/3) |
 | [`mdhender/worgen`](https://github.com/mdhender/worgen) | Star-system data based on *Architect of Worlds* | Active Go library and CLI | 2026-04-23 | [#4](https://github.com/maloquacious/mappe/issues/4) |
 | [`mdhender/lutymaps`](https://github.com/mdhender/lutymaps) | Galactic maps | Dormant Go prototype with minimal documentation | 2025-04-30 | [#5](https://github.com/maloquacious/mappe/issues/5) |
@@ -55,6 +55,26 @@ with one of two outcomes:
 
 Code should not be imported until its review issue records a decision.
 
+## Included domain models
+
+The `domains` package includes the stable elevation, heat, moisture, climate,
+and 27-value terrain vocabulary migrated from
+[`mdhender/wgva`](https://github.com/mdhender/wgva). `EnvironmentalMap`
+classifies normalized physical samples on a finite Cartesian, row-major grid.
+It preserves elevation, heat, moisture, relief, basin, and volcanic values
+beside their derived elevation band, two-axis climate, and terrain or biome.
+The ordered classifier includes ocean depth, ice, volcanic, elevated, wetland,
+coast, and climate-cover rules. Inland sea and lake retain their stable IDs but
+are not yet produced.
+
+The source model's signed physical values are mapped linearly onto Mappe's
+normalized `[0,1]` convention: `0.5` is sea level and the neutral value for
+heat, moisture, basin, and volcanic tendency. `GridTopology` independently
+records east-west and north-south wrapping so neighbor-based classification is
+correct at each Cartesian edge. The source hex coordinates, unbounded field
+generation, rim, commands, renderers, and palettes remain intentionally
+omitted. The preserved MIT notice is in `docs/licenses/wgva-MIT.txt`.
+
 ## Included generators
 
 ### `olsson`
@@ -66,7 +86,9 @@ generator. The migration retains its equirectangular map construction while
 accepting a caller-owned `math/rand/v2` source in place of process-global
 randomness. `GenerateNormalizedHeightMap` returns a
 `domains.NormalizedHeightMap` whose elevations are `float64` values in the
-inclusive range `[0,1]`; a flat map contains only zero elevations. The source
+inclusive range `[0,1]`; a flat map contains only zero elevations.
+`GenerateHeightField` additionally records the equirectangular topology:
+east-west wrapping with distinct north and south polar boundaries. The source
 commands, rendering, projections, and unrelated experimental generators remain
 intentionally omitted.
 
@@ -99,8 +121,9 @@ generator migrated from
 Each iteration raises or lowers a uniformly sized circular region. Circles may
 be clipped at the map edges or wrap across both axes. The package accepts a
 caller-owned `math/rand/v2` source and returns a `domains.NormalizedHeightMap`;
-a flat map contains only zero elevations. It remains internal, with named
-pipelines providing its public integration boundary.
+a flat map contains only zero elevations. `GenerateHeightField` derives both
+wrapping axes from the existing `Config.Wrap` value. The package remains
+internal, with named pipelines providing its public integration boundary.
 
 ## Stages and pipelines
 
@@ -108,6 +131,12 @@ A generator stage starts with a random source and generation values such as
 height and width, and produces a domain object. A renderer stage translates a
 domain object into another domain object or an external format. A pipeline
 arranges generator and renderer stages to create an artifact.
+
+Height-map pipelines now carry a `domains.HeightField`, which pairs the
+immutable `NormalizedHeightMap` with its `GridTopology`. Pipelines derive that
+topology from generator behavior and configuration rather than accepting
+duplicate wrapping flags. Existing PNG renderers remain topology-agnostic and
+consume the enclosed normalized height map.
 
 Package `renderers/monochromepng` translates a `domains.NormalizedHeightMap`
 into an 8-bit grayscale PNG. Elevation `0` is black, elevation `1` is white,

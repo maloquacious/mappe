@@ -29,11 +29,11 @@ import (
 // Run generates a flat normalized height map and writes it as a monochrome PNG
 // to w.
 func Run(w io.Writer, cfg flat.Config) error {
-	heightMap, err := flat.GenerateNormalizedHeightMap(cfg)
+	heightField, err := flat.GenerateHeightField(cfg)
 	if err != nil {
 		return fmt.Errorf("flat-monochrome-png: generate height map: %w", err)
 	}
-	if err := monochromepng.Render(w, heightMap); err != nil {
+	if err := monochromepng.Render(w, heightField.HeightMap()); err != nil {
 		return fmt.Errorf("flat-monochrome-png: render height map: %w", err)
 	}
 	return nil

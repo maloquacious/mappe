@@ -29,11 +29,11 @@ import (
 // Run generates a flat normalized height map and writes it as a cartographic
 // PNG to w.
 func Run(w io.Writer, generatorConfig flat.Config, rendererConfig cartographicpng.Config) error {
-	heightMap, err := flat.GenerateNormalizedHeightMap(generatorConfig)
+	heightField, err := flat.GenerateHeightField(generatorConfig)
 	if err != nil {
 		return fmt.Errorf("flat-cartographic-png: generate height map: %w", err)
 	}
-	if err := cartographicpng.Render(w, heightMap, rendererConfig); err != nil {
+	if err := cartographicpng.Render(w, heightField.HeightMap(), rendererConfig); err != nil {
 		return fmt.Errorf("flat-cartographic-png: render height map: %w", err)
 	}
 	return nil

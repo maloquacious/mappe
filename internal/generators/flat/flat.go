@@ -58,6 +58,19 @@ func GenerateNormalizedHeightMap(cfg Config) (*domains.NormalizedHeightMap, erro
 	return domains.NewNormalizedHeightMap(cfg.Width, cfg.Height, normalize(elevations))
 }
 
+// GenerateHeightField creates a normalized height field whose topology records
+// whether cfg wraps generated terrain across both Cartesian axes.
+func GenerateHeightField(cfg Config) (*domains.HeightField, error) {
+	heightMap, err := GenerateNormalizedHeightMap(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return domains.NewHeightField(heightMap, domains.GridTopology{
+		WrapEastWest:   cfg.Wrap,
+		WrapNorthSouth: cfg.Wrap,
+	})
+}
+
 func generateRaw(cfg Config) ([]int, error) {
 	if err := validate(cfg); err != nil {
 		return nil, err

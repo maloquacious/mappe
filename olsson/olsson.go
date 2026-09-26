@@ -62,6 +62,16 @@ func GenerateNormalizedHeightMap(cfg Config) (*domains.NormalizedHeightMap, erro
 	return domains.NewNormalizedHeightMap(cfg.Width, cfg.Height, normalize(elevations))
 }
 
+// GenerateHeightField creates an equirectangular height field. Longitude wraps
+// east-west; the north and south edges are distinct polar boundaries.
+func GenerateHeightField(cfg Config) (*domains.HeightField, error) {
+	heightMap, err := GenerateNormalizedHeightMap(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return domains.NewHeightField(heightMap, domains.GridTopology{WrapEastWest: true})
+}
+
 func generateRaw(cfg Config) ([]int, error) {
 	if cfg.Source == nil {
 		return nil, ErrNilSource

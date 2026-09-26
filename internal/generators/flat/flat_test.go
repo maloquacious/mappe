@@ -9,6 +9,8 @@ import (
 	"slices"
 	"sync"
 	"testing"
+
+	"github.com/maloquacious/mappe/domains"
 )
 
 func TestGenerateRawPreservesDrawOrderAndCoordinates(t *testing.T) {
@@ -175,6 +177,21 @@ func TestGenerateNormalizedHeightMapWithoutIterationsIsFlatAndConsumesNoRandomne
 	for i, elevation := range m.Elevations() {
 		if elevation != 0 {
 			t.Fatalf("elevation %d = %v, want 0", i, elevation)
+		}
+	}
+}
+
+func TestGenerateHeightFieldDerivesTopologyFromWrap(t *testing.T) {
+	for _, wrap := range []bool{false, true} {
+		field, err := GenerateHeightField(Config{
+			Source: rand.NewPCG(1, 0), Width: 4, Height: 3, Wrap: wrap,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := domains.GridTopology{WrapEastWest: wrap, WrapNorthSouth: wrap}
+		if field.Topology() != want {
+			t.Errorf("Wrap %v topology = %+v, want %+v", wrap, field.Topology(), want)
 		}
 	}
 }

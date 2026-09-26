@@ -119,6 +119,19 @@ func TestGenerateNormalizedHeightMapWithoutFaultsIsFlat(t *testing.T) {
 	}
 }
 
+func TestGenerateHeightFieldHasEquirectangularTopology(t *testing.T) {
+	field, err := GenerateHeightField(Config{
+		Source: rand.NewPCG(1, 0), Width: 10, Height: 5,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := domains.GridTopology{WrapEastWest: true}
+	if field.Topology() != want {
+		t.Fatalf("Topology = %+v, want %+v", field.Topology(), want)
+	}
+}
+
 func TestGenerateNormalizedHeightMapRejectsInvalidConfig(t *testing.T) {
 	tests := []struct {
 		name string
