@@ -66,7 +66,7 @@ generators  ->  domains  <-  renderers
 ### Value conventions
 
 - All physical values are normalized `float64` in `[0, 1]`. `0.5` is the
-  neutral value for heat, moisture, basin, and volcanic tendency; signed
+  neutral value for heat, moisture, and basin; signed
   source-model values are mapped linearly onto that range.
 - Sea level is **not** `0.5`. Generators min-max normalize, so elevation
   boundaries come from a `domains.ElevationLevels` value (absolute elevations for
@@ -80,9 +80,14 @@ generators  ->  domains  <-  renderers
   produced by the classifier.
 - `ClassificationConfig.Validate` enforces the ordering that keeps every
   declared band and terrain rule reachable; the ordered classifier in
-  `domains/terrain.go` (ocean depth, ice, volcanic, elevated, wetland, coast,
-  then the climate-cover biome table) preserves the source precedence, and
-  `TestTerrainRulesPreserveSourcePrecedence` guards it.
+  `domains/terrain.go` (ocean depth, volcanic, ice, elevated, wetland, coast,
+  then the climate-cover biome table) follows the source precedence except that
+  volcanism outranks ice, and `TestTerrainRulesPreserveSourcePrecedence` guards
+  it.
+- Volcanism is point features, not a per-tile field: `internal/volcanism/sites`
+  places sites (density per land tile, hotspot islands included) and builds
+  cones on a copy of the heights, returning a new `HeightField` plus
+  `domains.VolcanicFeatures`. It uses its own PCG stream (`seed`, 1).
 
 ## Go conventions
 

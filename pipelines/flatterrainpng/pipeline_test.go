@@ -12,15 +12,16 @@ import (
 	"github.com/maloquacious/mappe/domains"
 	"github.com/maloquacious/mappe/internal/generators/flat"
 	"github.com/maloquacious/mappe/internal/levels/percentile"
+	"github.com/maloquacious/mappe/internal/volcanism/sites"
 	"github.com/maloquacious/mappe/renderers/terrainpng"
 )
 
 func TestRunProducesDeterministicTerrainPNG(t *testing.T) {
 	var first, second bytes.Buffer
-	if err := Run(&first, testConfig(42), percentile.DefaultConfig(), domains.DefaultClassificationConfig()); err != nil {
+	if err := Run(&first, testConfig(42), percentile.DefaultConfig(), volcanismConfig(42), domains.DefaultClassificationConfig()); err != nil {
 		t.Fatal(err)
 	}
-	if err := Run(&second, testConfig(42), percentile.DefaultConfig(), domains.DefaultClassificationConfig()); err != nil {
+	if err := Run(&second, testConfig(42), percentile.DefaultConfig(), volcanismConfig(42), domains.DefaultClassificationConfig()); err != nil {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(first.Bytes(), second.Bytes()) {
@@ -44,7 +45,7 @@ func TestDiagnosticFieldsAreNormalizedAndUseHeightTopology(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	environmentalMap, err := classify(heightField, levels, domains.DefaultClassificationConfig())
+	environmentalMap, err := classify(heightField, levels, noVolcanism(t, heightField), domains.DefaultClassificationConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +57,7 @@ func TestDiagnosticFieldsAreNormalizedAndUseHeightTopology(t *testing.T) {
 		seen[cell.Terrain] = true
 		for _, value := range []float64{
 			cell.Sample.Elevation, cell.Sample.Heat, cell.Sample.Moisture,
-			cell.Sample.Relief, cell.Sample.Basin, cell.Sample.Volcanic,
+			cell.Sample.Relief, cell.Sample.Basin,
 		} {
 			if value < 0 || value > 1 {
 				t.Fatalf("sample value %v outside [0, 1]", value)
@@ -82,7 +83,7 @@ func TestDiagnosticFieldsAreContinuousAcrossWrappedSeams(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	environmentalMap, err := classify(heightField, levels, domains.DefaultClassificationConfig())
+	environmentalMap, err := classify(heightField, levels, noVolcanism(t, heightField), domains.DefaultClassificationConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +110,7 @@ func TestClassifiedWaterMatchesRequestedOceanShare(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		environmentalMap, err := classify(heightField, levels, domains.DefaultClassificationConfig())
+		environmentalMap, err := classify(heightField, levels, noVolcanism(t, heightField), domains.DefaultClassificationConfig())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -138,6 +139,47 @@ func TestClassifiedWaterMatchesRequestedOceanShare(t *testing.T) {
 	}
 }
 
+func TestVolcanoSitesBecomeVolcanoTerrain(t *testing.T) {
+	heightField, err := flat.GenerateHeightField(flat.Config{
+		Source: rand.NewPCG(42, 0), Width: 128, Height: 64, Iterations: 1000, Wrap: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	levels, err := percentile.Derive(heightField, percentile.DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := volcanismConfig(42)
+	cfg.LandTilesPerSite = 200
+	volcanism, err := sites.Place(heightField, levels, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	environmentalMap, err := classify(volcanism.HeightField, levels, volcanism.Features, domains.DefaultClassificationConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	sitesPlaced := volcanism.Features.Sites()
+	if len(sitesPlaced) == 0 {
+		t.Fatal("no volcano sites placed")
+	}
+	for _, site := range sitesPlaced {
+		if got := environmentalMap.Cell(site.X, site.Y).Terrain; got != domains.TerrainVolcano {
+			t.Errorf("site %+v terrain = %v, want volcano", site, got)
+		}
+	}
+	volcanoes := 0
+	for _, cell := range environmentalMap.Cells() {
+		if cell.Terrain == domains.TerrainVolcano {
+			volcanoes++
+		}
+	}
+	if volcanoes != len(sitesPlaced) {
+		t.Fatalf("volcano tiles = %d, want one per site (%d)", volcanoes, len(sitesPlaced))
+	}
+}
+
 func TestRiseAboveSeaIsMeasuredFromDerivedSeaLevel(t *testing.T) {
 	for _, tt := range []struct {
 		elevation, seaLevel, mountain, want float64
@@ -155,26 +197,46 @@ func TestRiseAboveSeaIsMeasuredFromDerivedSeaLevel(t *testing.T) {
 }
 
 func TestRunIdentifiesFailingStage(t *testing.T) {
-	if err := Run(&bytes.Buffer{}, flat.Config{}, percentile.DefaultConfig(), domains.DefaultClassificationConfig()); !errors.Is(err, flat.ErrNilSource) {
+	if err := Run(&bytes.Buffer{}, flat.Config{}, percentile.DefaultConfig(), volcanismConfig(42), domains.DefaultClassificationConfig()); !errors.Is(err, flat.ErrNilSource) {
 		t.Fatalf("generator error = %v, want error wrapping %v", err, flat.ErrNilSource)
 	}
 	badLevels := percentile.DefaultConfig()
 	badLevels.OceanPercent = 101
-	if err := Run(&bytes.Buffer{}, testConfig(42), badLevels, domains.DefaultClassificationConfig()); !errors.Is(err, percentile.ErrInvalidOceanPercent) {
+	if err := Run(&bytes.Buffer{}, testConfig(42), badLevels, volcanismConfig(42), domains.DefaultClassificationConfig()); !errors.Is(err, percentile.ErrInvalidOceanPercent) {
 		t.Fatalf("levels error = %v, want error wrapping %v", err, percentile.ErrInvalidOceanPercent)
+	}
+	badVolcanism := volcanismConfig(42)
+	badVolcanism.Source = nil
+	if err := Run(&bytes.Buffer{}, testConfig(42), percentile.DefaultConfig(), badVolcanism, domains.DefaultClassificationConfig()); !errors.Is(err, sites.ErrNilSource) {
+		t.Fatalf("volcanism error = %v, want error wrapping %v", err, sites.ErrNilSource)
 	}
 	badConfig := domains.DefaultClassificationConfig()
 	badConfig.Heat.Cold = badConfig.Heat.Polar
-	if err := Run(&bytes.Buffer{}, testConfig(42), percentile.DefaultConfig(), badConfig); !errors.Is(err, domains.ErrInvalidClassificationConfig) {
+	if err := Run(&bytes.Buffer{}, testConfig(42), percentile.DefaultConfig(), volcanismConfig(42), badConfig); !errors.Is(err, domains.ErrInvalidClassificationConfig) {
 		t.Fatalf("classification error = %v, want error wrapping %v", err, domains.ErrInvalidClassificationConfig)
 	}
 	want := errors.New("write failed")
-	if err := Run(errorWriter{err: want}, testConfig(42), percentile.DefaultConfig(), domains.DefaultClassificationConfig()); !errors.Is(err, want) {
+	if err := Run(errorWriter{err: want}, testConfig(42), percentile.DefaultConfig(), volcanismConfig(42), domains.DefaultClassificationConfig()); !errors.Is(err, want) {
 		t.Fatalf("renderer error = %v, want error wrapping %v", err, want)
 	}
-	if err := Run(nil, testConfig(42), percentile.DefaultConfig(), domains.DefaultClassificationConfig()); !errors.Is(err, terrainpng.ErrNilWriter) {
+	if err := Run(nil, testConfig(42), percentile.DefaultConfig(), volcanismConfig(42), domains.DefaultClassificationConfig()); !errors.Is(err, terrainpng.ErrNilWriter) {
 		t.Fatalf("nil writer error = %v, want error wrapping %v", err, terrainpng.ErrNilWriter)
 	}
+}
+
+func volcanismConfig(seed uint64) sites.Config {
+	cfg := sites.DefaultConfig()
+	cfg.Source = rand.NewPCG(seed, 1)
+	return cfg
+}
+
+func noVolcanism(t *testing.T, heightField *domains.HeightField) *domains.VolcanicFeatures {
+	t.Helper()
+	features, err := domains.NewVolcanicFeatures(heightField.Width(), heightField.Height(), nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return features
 }
 
 func testConfig(seed uint64) flat.Config {
@@ -187,7 +249,7 @@ func assertNearbySamples(t *testing.T, a, b domains.EnvironmentalSample) {
 	t.Helper()
 	for _, pair := range [][2]float64{
 		{a.Heat, b.Heat}, {a.Moisture, b.Moisture},
-		{a.Basin, b.Basin}, {a.Volcanic, b.Volcanic},
+		{a.Basin, b.Basin},
 	} {
 		if difference := max(pair[0], pair[1]) - min(pair[0], pair[1]); difference > 0.12 {
 			t.Fatalf("wrapped seam difference = %v between %v and %v", difference, pair[0], pair[1])

@@ -138,12 +138,12 @@ func TestTerrainRulesPreserveSourcePrecedence(t *testing.T) {
 	cfg := DefaultClassificationConfig()
 	levels := testLevels(t)
 	values := levels.Values()
-	base := EnvironmentalSample{Elevation: 0.55, Heat: 0.5, Moisture: 0.5, Relief: 0.1, Basin: 0.5, Volcanic: 0.5}
-	test := func(sample EnvironmentalSample, landNeighbor, waterNeighbor bool) Terrain {
+	base := EnvironmentalSample{Elevation: 0.55, Heat: 0.5, Moisture: 0.5, Relief: 0.1, Basin: 0.5}
+	test := func(sample EnvironmentalSample, landNeighbor, waterNeighbor bool, volcanic VolcanicKind) Terrain {
 		elevation := levels.Classify(sample.Elevation)
 		heat := cfg.Heat.Classify(sample.Heat)
 		wetness := adjustedWetness(sample.Moisture, sample.Basin, cfg.BasinMoistureWeight)
-		return classifyTerrain(sample, elevation, heat, wetness, cfg.Moisture.Classify(wetness), landNeighbor, waterNeighbor, values, cfg)
+		return classifyTerrain(sample, elevation, heat, wetness, cfg.Moisture.Classify(wetness), landNeighbor, waterNeighbor, volcanic, values, cfg)
 	}
 	with := func(change func(*EnvironmentalSample)) EnvironmentalSample {
 		sample := base
@@ -156,6 +156,7 @@ func TestTerrainRulesPreserveSourcePrecedence(t *testing.T) {
 		sample        EnvironmentalSample
 		landNeighbor  bool
 		waterNeighbor bool
+		volcanic      VolcanicKind
 		want          Terrain
 	}{
 		{name: "coastal water outranks depth", sample: with(func(s *EnvironmentalSample) { s.Elevation = 0.1 }), landNeighbor: true, want: TerrainCoastalWater},
@@ -165,13 +166,13 @@ func TestTerrainRulesPreserveSourcePrecedence(t *testing.T) {
 		{name: "above shelf is shallow sea", sample: with(func(s *EnvironmentalSample) { s.Elevation = math.Nextafter(values.Shelf, 1) }), want: TerrainShallowSea},
 		{name: "sea level is water", sample: with(func(s *EnvironmentalSample) { s.Elevation = values.SeaLevel }), want: TerrainShallowSea},
 		{name: "ice outranks mountain", sample: with(func(s *EnvironmentalSample) { s.Elevation, s.Heat = 0.9, cfg.Terrain.IceHeat }), want: TerrainGlacialIce},
-		{name: "volcano outranks mountain", sample: with(func(s *EnvironmentalSample) { s.Elevation, s.Volcanic, s.Relief = 0.9, 0.9, 0.9 }), want: TerrainVolcano},
-		{name: "volcanic highland outranks hills", sample: with(func(s *EnvironmentalSample) {
-			s.Elevation, s.Volcanic = values.Highland, cfg.Terrain.VolcanicHighlandThreshold
-		}), want: TerrainVolcanicHighland},
-		{name: "volcanism needs the highland level", sample: with(func(s *EnvironmentalSample) {
-			s.Elevation, s.Volcanic, s.Relief = math.Nextafter(values.Highland, 0), 0.9, 0.1
-		}), want: TerrainGrassland},
+		{name: "volcanism ignores water", sample: with(func(s *EnvironmentalSample) { s.Elevation = values.SeaLevel }), volcanic: VolcanicVolcano, want: TerrainShallowSea},
+		{name: "volcano outranks ice", sample: with(func(s *EnvironmentalSample) { s.Elevation, s.Heat = 0.9, cfg.Terrain.IceHeat }), volcanic: VolcanicVolcano, want: TerrainVolcano},
+		{name: "volcanic highland outranks ice", sample: with(func(s *EnvironmentalSample) { s.Heat = cfg.Terrain.IceHeat }), volcanic: VolcanicHighland, want: TerrainVolcanicHighland},
+		{name: "volcano outranks mountain", sample: with(func(s *EnvironmentalSample) { s.Elevation = 0.9 }), volcanic: VolcanicVolcano, want: TerrainVolcano},
+		{name: "volcanic highland outranks hills", sample: with(func(s *EnvironmentalSample) { s.Elevation = values.Highland }), volcanic: VolcanicHighland, want: TerrainVolcanicHighland},
+		{name: "volcanic highland reaches lowland", sample: base, volcanic: VolcanicHighland, want: TerrainVolcanicHighland},
+		{name: "volcano outranks coast", sample: base, waterNeighbor: true, volcanic: VolcanicVolcano, want: TerrainVolcano},
 		{name: "cold mountain is alpine", sample: with(func(s *EnvironmentalSample) { s.Elevation, s.Heat = 0.9, cfg.Terrain.AlpineHeat }), want: TerrainAlpine},
 		{name: "relief makes hills", sample: with(func(s *EnvironmentalSample) { s.Relief = cfg.Terrain.HillsRelief }), want: TerrainHills},
 		{name: "wetland outranks coast", sample: with(func(s *EnvironmentalSample) { s.Moisture = cfg.Terrain.WetlandWetness }), waterNeighbor: true, want: TerrainMarsh},
@@ -182,7 +183,7 @@ func TestTerrainRulesPreserveSourcePrecedence(t *testing.T) {
 		{name: "ordinary ground uses biome", sample: base, want: TerrainGrassland},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := test(tt.sample, tt.landNeighbor, tt.waterNeighbor); got != tt.want {
+			if got := test(tt.sample, tt.landNeighbor, tt.waterNeighbor, tt.volcanic); got != tt.want {
 				t.Fatalf("terrain = %v, want %v", got, tt.want)
 			}
 		})

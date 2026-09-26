@@ -15,8 +15,8 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 // Package flatterrainpng composes the flat generator, percentile elevation
-// levels, deterministic diagnostic environmental fields, and the terrain PNG
-// renderer.
+// levels, volcano sites, deterministic diagnostic environmental fields, and the
+// terrain PNG renderer.
 package flatterrainpng
 
 import (
@@ -27,6 +27,7 @@ import (
 	"github.com/maloquacious/mappe/domains"
 	"github.com/maloquacious/mappe/internal/generators/flat"
 	"github.com/maloquacious/mappe/internal/levels/percentile"
+	"github.com/maloquacious/mappe/internal/volcanism/sites"
 	"github.com/maloquacious/mappe/renderers/terrainpng"
 )
 
@@ -35,10 +36,11 @@ import (
 const mountainCooling = 0.1875
 
 // Run generates a flat height field, derives its elevation levels from tile
-// percentages, derives deterministic periodic environmental samples, classifies
-// their terrain, and writes a PNG to w. The environmental fields are diagnostic
-// rather than a climatological model.
-func Run(w io.Writer, generatorConfig flat.Config, levelsConfig percentile.Config, classificationConfig domains.ClassificationConfig) error {
+// percentages, places volcanoes and builds their cones, derives deterministic
+// periodic environmental samples, classifies their terrain, and writes a PNG to
+// w. The elevation levels stay fixed after volcanism. The environmental fields
+// are diagnostic rather than a climatological model.
+func Run(w io.Writer, generatorConfig flat.Config, levelsConfig percentile.Config, volcanismConfig sites.Config, classificationConfig domains.ClassificationConfig) error {
 	heightField, err := flat.GenerateHeightField(generatorConfig)
 	if err != nil {
 		return fmt.Errorf("flat-terrain-png: generate height field: %w", err)
@@ -47,7 +49,11 @@ func Run(w io.Writer, generatorConfig flat.Config, levelsConfig percentile.Confi
 	if err != nil {
 		return fmt.Errorf("flat-terrain-png: derive elevation levels: %w", err)
 	}
-	environmentalMap, err := classify(heightField, levels, classificationConfig)
+	volcanism, err := sites.Place(heightField, levels, volcanismConfig)
+	if err != nil {
+		return fmt.Errorf("flat-terrain-png: place volcanoes: %w", err)
+	}
+	environmentalMap, err := classify(volcanism.HeightField, levels, volcanism.Features, classificationConfig)
 	if err != nil {
 		return fmt.Errorf("flat-terrain-png: classify environment: %w", err)
 	}
@@ -57,7 +63,7 @@ func Run(w io.Writer, generatorConfig flat.Config, levelsConfig percentile.Confi
 	return nil
 }
 
-func classify(heightField *domains.HeightField, levels *domains.ElevationLevels, cfg domains.ClassificationConfig) (*domains.EnvironmentalMap, error) {
+func classify(heightField *domains.HeightField, levels *domains.ElevationLevels, volcanic *domains.VolcanicFeatures, cfg domains.ClassificationConfig) (*domains.EnvironmentalMap, error) {
 	width, height := heightField.Width(), heightField.Height()
 	seaLevel, mountain := levels.Values().SeaLevel, levels.Values().Mountain
 	samples := make([]domains.EnvironmentalSample, width*height)
@@ -74,11 +80,10 @@ func classify(heightField *domains.HeightField, levels *domains.ElevationLevels,
 				Moisture:  clampNormalized(0.5 + 0.3*math.Sin(phaseX-phaseY) + 0.2*math.Cos(phaseX+2*phaseY)),
 				Relief:    reliefAt(heightField, x, y),
 				Basin:     clampNormalized(0.5 + 0.5*math.Sin(phaseX+2*phaseY)),
-				Volcanic:  clampNormalized(0.5 + 0.5*math.Cos(3*phaseX-phaseY)),
 			}
 		}
 	}
-	return domains.NewEnvironmentalMap(width, height, heightField.Topology(), samples, levels, cfg)
+	return domains.NewEnvironmentalMap(width, height, heightField.Topology(), samples, levels, volcanic, cfg)
 }
 
 // riseAboveSea returns height above sea level in units of the mountain level's

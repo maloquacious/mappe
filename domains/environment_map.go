@@ -19,19 +19,20 @@ const (
 	ErrInvalidEnvironmentalSample      cerrs.Error = "domains: environmental samples must contain finite normalized values in [0, 1]"
 	ErrInvalidClassificationConfig     cerrs.Error = "domains: classification thresholds must be finite, normalized, and ordered"
 	ErrNilElevationLevels              cerrs.Error = "domains: elevation levels must not be nil"
+	ErrNilVolcanicFeatures             cerrs.Error = "domains: volcanic features must not be nil"
+	ErrVolcanicFeaturesSize            cerrs.Error = "domains: volcanic features must match the environmental map size"
 )
 
 // EnvironmentalSample contains the normalized physical values used to classify
 // one Cartesian cell. All values are in [0, 1]. Sea level and the other
 // elevation boundaries come from ElevationLevels rather than a fixed value;
-// heat, moisture, basin, and volcanic values use 0.5 as their neutral value.
+// heat, moisture, and basin values use 0.5 as their neutral value.
 type EnvironmentalSample struct {
 	Elevation float64
 	Heat      float64
 	Moisture  float64
 	Relief    float64
 	Basin     float64
-	Volcanic  float64
 }
 
 // EnvironmentalCell preserves a cell's physical values beside its derived
@@ -65,17 +66,14 @@ func DefaultClassificationConfig() ClassificationConfig {
 		},
 		BasinMoistureWeight: 0.6,
 		Terrain: TerrainThresholds{
-			IceHeat:                   0.09,
-			AlpineHeat:                0.35,
-			VolcanoThreshold:          0.825,
-			VolcanoRelief:             0.45,
-			VolcanicHighlandThreshold: 0.775,
-			HillsRelief:               0.6,
-			WetlandWetness:            0.7,
-			WetlandRelief:             0.3,
-			BogHeat:                   0.375,
-			SwampHeat:                 0.65,
-			BadlandsRelief:            0.4,
+			IceHeat:        0.09,
+			AlpineHeat:     0.35,
+			HillsRelief:    0.6,
+			WetlandWetness: 0.7,
+			WetlandRelief:  0.3,
+			BogHeat:        0.375,
+			SwampHeat:      0.65,
+			BadlandsRelief: 0.4,
 		},
 	}
 }
@@ -93,7 +91,7 @@ func (c ClassificationConfig) Validate() error {
 	}
 	for _, value := range []float64{
 		c.BasinMoistureWeight,
-		c.Terrain.VolcanoRelief, c.Terrain.HillsRelief,
+		c.Terrain.HillsRelief,
 		c.Terrain.WetlandRelief, c.Terrain.BadlandsRelief,
 	} {
 		if !normalized(value) {
@@ -102,7 +100,6 @@ func (c ClassificationConfig) Validate() error {
 	}
 	for _, value := range []float64{
 		c.Terrain.IceHeat, c.Terrain.AlpineHeat,
-		c.Terrain.VolcanoThreshold, c.Terrain.VolcanicHighlandThreshold,
 		c.Terrain.WetlandWetness, c.Terrain.BogHeat, c.Terrain.SwampHeat,
 	} {
 		if value <= 0 || value >= 1 || !normalized(value) {
@@ -110,8 +107,7 @@ func (c ClassificationConfig) Validate() error {
 		}
 	}
 	if c.Terrain.IceHeat >= c.Terrain.AlpineHeat ||
-		c.Terrain.BogHeat >= c.Terrain.SwampHeat ||
-		c.Terrain.VolcanicHighlandThreshold >= c.Terrain.VolcanoThreshold {
+		c.Terrain.BogHeat >= c.Terrain.SwampHeat {
 		return ErrInvalidClassificationConfig
 	}
 	return nil
@@ -126,10 +122,10 @@ type EnvironmentalMap struct {
 }
 
 // NewEnvironmentalMap validates and classifies row-major samples. Elevation
-// bands, water, and depth come from levels, whichever stage produced them.
-// Neighbor classification uses the supplied topology at all four Cartesian
-// edges.
-func NewEnvironmentalMap(width, height int, topology GridTopology, samples []EnvironmentalSample, levels *ElevationLevels, cfg ClassificationConfig) (*EnvironmentalMap, error) {
+// bands, water, and depth come from levels, and volcanism from volcanic,
+// whichever stages produced them. Volcanic kinds apply only to land. Neighbor
+// classification uses the supplied topology at all four Cartesian edges.
+func NewEnvironmentalMap(width, height int, topology GridTopology, samples []EnvironmentalSample, levels *ElevationLevels, volcanic *VolcanicFeatures, cfg ClassificationConfig) (*EnvironmentalMap, error) {
 	if width < 1 {
 		return nil, ErrInvalidWidth
 	}
@@ -141,6 +137,12 @@ func NewEnvironmentalMap(width, height int, topology GridTopology, samples []Env
 	}
 	if levels == nil {
 		return nil, ErrNilElevationLevels
+	}
+	if volcanic == nil {
+		return nil, ErrNilVolcanicFeatures
+	}
+	if volcanic.width != width || volcanic.height != height {
+		return nil, ErrVolcanicFeaturesSize
 	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err
@@ -175,6 +177,7 @@ func NewEnvironmentalMap(width, height int, topology GridTopology, samples []Env
 					cfg.Moisture.Classify(wetness),
 					landNeighbor,
 					waterNeighbor,
+					volcanic.kinds[index],
 					levels.values,
 					cfg,
 				),
@@ -210,7 +213,7 @@ func (m *EnvironmentalMap) Cells() []EnvironmentalCell {
 
 func (s EnvironmentalSample) valid() bool {
 	return normalized(s.Elevation) && normalized(s.Heat) && normalized(s.Moisture) &&
-		normalized(s.Relief) && normalized(s.Basin) && normalized(s.Volcanic)
+		normalized(s.Relief) && normalized(s.Basin)
 }
 
 func normalized(value float64) bool {

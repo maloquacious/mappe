@@ -12,6 +12,7 @@ import (
 	"github.com/maloquacious/mappe/domains"
 	"github.com/maloquacious/mappe/internal/generators/flat"
 	"github.com/maloquacious/mappe/internal/levels/percentile"
+	"github.com/maloquacious/mappe/internal/volcanism/sites"
 	"github.com/maloquacious/mappe/olsson"
 	"github.com/maloquacious/mappe/pipelines/flatcartographicpng"
 	"github.com/maloquacious/mappe/pipelines/flatmonochromepng"
@@ -175,9 +176,11 @@ func TestFlatTerrainPNGCommandWritesSelectedArtifact(t *testing.T) {
 	var want bytes.Buffer
 	levelsConfig := percentile.DefaultConfig()
 	levelsConfig.OceanPercent = 30
+	volcanismConfig := sites.DefaultConfig()
+	volcanismConfig.Source = rand.NewPCG(42, 1)
 	if err := flatterrainpng.Run(&want, flat.Config{
 		Source: rand.NewPCG(42, 0), Width: 32, Height: 16, Iterations: 100, Wrap: true,
-	}, levelsConfig, domains.DefaultClassificationConfig()); err != nil {
+	}, levelsConfig, volcanismConfig, domains.DefaultClassificationConfig()); err != nil {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(got, want.Bytes()) {

@@ -14,7 +14,7 @@ func TestRenderMapsTerrainToPixelsWithoutTransposingCoordinates(t *testing.T) {
 		sample(0.1, 0.5, 0.5), sample(0.55, 0.5, 0.5),
 		sample(0.55, 0.9, 0.1), sample(0.9, 0.5, 0.5),
 	}
-	environmentalMap, err := domains.NewEnvironmentalMap(2, 2, domains.GridTopology{}, samples, testLevels(t), domains.DefaultClassificationConfig())
+	environmentalMap, err := domains.NewEnvironmentalMap(2, 2, domains.GridTopology{}, samples, testLevels(t), noVolcanism(t, 2, 2), domains.DefaultClassificationConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +53,7 @@ func TestPaletteCoversEveryTerrainWithOpaqueColors(t *testing.T) {
 }
 
 func TestRenderRejectsNilInputs(t *testing.T) {
-	environmentalMap, err := domains.NewEnvironmentalMap(1, 1, domains.GridTopology{}, []domains.EnvironmentalSample{sample(0.55, 0.5, 0.5)}, testLevels(t), domains.DefaultClassificationConfig())
+	environmentalMap, err := domains.NewEnvironmentalMap(1, 1, domains.GridTopology{}, []domains.EnvironmentalSample{sample(0.55, 0.5, 0.5)}, testLevels(t), noVolcanism(t, 1, 1), domains.DefaultClassificationConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,6 @@ func sample(elevation, heat, moisture float64) domains.EnvironmentalSample {
 		Moisture:  moisture,
 		Relief:    0.1,
 		Basin:     0.5,
-		Volcanic:  0.5,
 	}
 }
 
@@ -85,4 +84,13 @@ func testLevels(t *testing.T) *domains.ElevationLevels {
 		t.Fatal(err)
 	}
 	return levels
+}
+
+func noVolcanism(t *testing.T, width, height int) *domains.VolcanicFeatures {
+	t.Helper()
+	features, err := domains.NewVolcanicFeatures(width, height, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return features
 }

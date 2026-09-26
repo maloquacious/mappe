@@ -26,6 +26,7 @@ import (
 	"github.com/maloquacious/mappe/domains"
 	"github.com/maloquacious/mappe/internal/generators/flat"
 	"github.com/maloquacious/mappe/internal/levels/percentile"
+	"github.com/maloquacious/mappe/internal/volcanism/sites"
 	"github.com/maloquacious/mappe/olsson"
 	"github.com/maloquacious/mappe/pipelines/flatcartographicpng"
 	"github.com/maloquacious/mappe/pipelines/flatmonochromepng"
@@ -147,6 +148,7 @@ func newFlatTerrainPNGCommand() *cobra.Command {
 		Iterations: 10000,
 	}
 	levelsConfig := percentile.DefaultConfig()
+	volcanismConfig := sites.DefaultConfig()
 
 	cmd := &cobra.Command{
 		Use:   "flat-terrain-png",
@@ -154,7 +156,10 @@ func newFlatTerrainPNGCommand() *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			cfg.Source = rand.NewPCG(uint64(seed), 0)
-			return writeFlatTerrainPNG(outputPath, cfg, levelsConfig)
+			// Volcanism draws from its own stream, so its settings never
+			// change the generated terrain.
+			volcanismConfig.Source = rand.NewPCG(uint64(seed), 1)
+			return writeFlatTerrainPNG(outputPath, cfg, levelsConfig, volcanismConfig)
 		},
 	}
 	cmd.Flags().Int64Var(&seed, "seed", seed, "pseudorandom seed")
@@ -168,9 +173,9 @@ func newFlatTerrainPNGCommand() *cobra.Command {
 	return cmd
 }
 
-func writeFlatTerrainPNG(path string, cfg flat.Config, levelsConfig percentile.Config) error {
+func writeFlatTerrainPNG(path string, cfg flat.Config, levelsConfig percentile.Config, volcanismConfig sites.Config) error {
 	return writePNG(path, func(output io.Writer) error {
-		return flatterrainpng.Run(output, cfg, levelsConfig, domains.DefaultClassificationConfig())
+		return flatterrainpng.Run(output, cfg, levelsConfig, volcanismConfig, domains.DefaultClassificationConfig())
 	})
 }
 

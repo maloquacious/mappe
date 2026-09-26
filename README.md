@@ -61,15 +61,17 @@ The `domains` package includes the stable elevation, heat, moisture, climate,
 and 27-value terrain vocabulary migrated from
 [`mdhender/wgva`](https://github.com/mdhender/wgva). `EnvironmentalMap`
 classifies normalized physical samples on a finite Cartesian, row-major grid.
-It preserves elevation, heat, moisture, relief, basin, and volcanic values
-beside their derived elevation band, two-axis climate, and terrain or biome.
-The ordered classifier includes ocean depth, ice, volcanic, elevated, wetland,
-coast, and climate-cover rules. Inland sea and lake retain their stable IDs but
-are not yet produced.
+It preserves elevation, heat, moisture, relief, and basin values beside their
+derived elevation band, two-axis climate, and terrain or biome. The ordered
+classifier applies ocean depth, volcanic, ice, elevated, wetland, coast, and
+climate-cover rules. Volcanism outranks ice (geology over climate), so a cold
+volcano stays a volcano. Volcanism comes from `VolcanicFeatures`, a grid of
+volcano sites and their volcanic-highland footprints that any stage may
+produce. Inland sea and lake retain their stable IDs but are not yet produced.
 
 The source model's signed physical values are mapped linearly onto Mappe's
 normalized `[0,1]` convention, where `0.5` is the neutral value for heat,
-moisture, basin, and volcanic tendency. Sea level is not fixed: generators
+moisture, and basin. Sea level is not fixed: generators
 stretch each height map to fill `[0,1]`, so `0.5` has no stable meaning as an
 elevation. Instead, `ElevationLevels` holds the absolute elevations of sea
 level, the continental shelf, the abyss, and the upland, highland, and mountain
@@ -160,10 +162,10 @@ Package `renderers/terrainpng` translates a `domains.EnvironmentalMap` into an
 opaque categorical PNG with one color per terrain value. The
 `flat-terrain-png` diagnostic pipeline exercises that renderer and the full
 Cartesian classifier. It derives elevation levels with the percentile stage,
-then deterministic periodic heat, moisture, basin, volcanic, and local-relief
-fields around the flat generator's elevation output. Those fields are intended
-to expose classification and topology behavior; they are not a climatological
-model.
+places volcanoes with the sites stage, then derives deterministic periodic
+heat, moisture, basin, and local-relief fields around the resulting elevations.
+Those fields are intended to expose classification and topology behavior; they
+are not a climatological model.
 
 The percentile stage (`internal/levels/percentile`) treats one pixel as one
 tile and derives every level by checking a tile percentage against the
@@ -174,6 +176,19 @@ deep ocean. Each percentage is a minimum: tiles that share an elevation stay on
 the same side of a level, so the achieved share can exceed the request.
 `ElevationLevels.Composition` reports the achieved shares. Only the ocean
 percentage is exposed as `--ocean-percent`.
+
+The sites stage (`internal/volcanism/sites`) places volcanoes as point features
+and builds their cones on a copy of the heights; the generator's height map is
+never modified, and the elevation levels stay fixed. By default there is one
+site per 2,500 land tiles, counted before volcanism, and 20 percent of them are
+hotspot islands in open ocean at least 3 tiles from land. Land sites are drawn
+with weights that favor local peaks, coasts within 6 tiles of deep ocean, and
+high ground, and every site is at least 8 tiles from the next. Each cone has a
+summit halfway between the mountain level and the highest possible elevation
+and descends to sea level 4 tiles out; in ocean it rises as an island. The site
+tile is a volcano and land within the cone radius is volcanic highland. The
+stage draws from its own random stream (`seed`, stream 1), so volcano settings
+never change the generated terrain. It exposes no command-line flags.
 
 The named `olsson-monochrome-png` pipeline composes the `olsson` generator with
 that renderer. Run it through the Cobra-based `mappe` command:

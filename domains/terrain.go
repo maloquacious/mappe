@@ -135,24 +135,21 @@ func (t Terrain) IsWater() bool {
 }
 
 // TerrainThresholds contains the normalized non-elevation thresholds used by
-// the ordered terrain and biome classifier. Ocean depth, the volcanic
-// elevation floor, and the wetland elevation ceiling come from
-// ElevationLevels.
+// the ordered terrain and biome classifier. Ocean depth and the wetland
+// elevation ceiling come from ElevationLevels; volcanism comes from
+// VolcanicFeatures.
 type TerrainThresholds struct {
-	IceHeat                   float64
-	AlpineHeat                float64
-	VolcanoThreshold          float64
-	VolcanoRelief             float64
-	VolcanicHighlandThreshold float64
-	HillsRelief               float64
-	WetlandWetness            float64
-	WetlandRelief             float64
-	BogHeat                   float64
-	SwampHeat                 float64
-	BadlandsRelief            float64
+	IceHeat        float64
+	AlpineHeat     float64
+	HillsRelief    float64
+	WetlandWetness float64
+	WetlandRelief  float64
+	BogHeat        float64
+	SwampHeat      float64
+	BadlandsRelief float64
 }
 
-func classifyTerrain(sample EnvironmentalSample, elevationBand ElevationBand, heatBand HeatBand, wetness float64, wetnessBand MoistureBand, landNeighbor, waterNeighbor bool, levels ElevationLevelValues, cfg ClassificationConfig) Terrain {
+func classifyTerrain(sample EnvironmentalSample, elevationBand ElevationBand, heatBand HeatBand, wetness float64, wetnessBand MoistureBand, landNeighbor, waterNeighbor bool, volcanic VolcanicKind, levels ElevationLevelValues, cfg ClassificationConfig) Terrain {
 	t := cfg.Terrain
 	if sample.Elevation <= levels.SeaLevel {
 		switch {
@@ -166,18 +163,15 @@ func classifyTerrain(sample EnvironmentalSample, elevationBand ElevationBand, he
 			return TerrainShallowSea
 		}
 	}
+	// Geology outranks climate: volcanic land stays volcanic however cold.
+	switch volcanic {
+	case VolcanicVolcano:
+		return TerrainVolcano
+	case VolcanicHighland:
+		return TerrainVolcanicHighland
+	}
 	if sample.Heat <= t.IceHeat {
 		return TerrainGlacialIce
-	}
-	// Until volcanism is placed as sites (#20), the highland level is the
-	// volcanic elevation floor.
-	if sample.Elevation >= levels.Highland {
-		switch {
-		case sample.Volcanic >= t.VolcanoThreshold && sample.Relief >= t.VolcanoRelief:
-			return TerrainVolcano
-		case sample.Volcanic >= t.VolcanicHighlandThreshold:
-			return TerrainVolcanicHighland
-		}
 	}
 	if elevationBand == ElevationMountain {
 		if sample.Heat <= t.AlpineHeat {
