@@ -9,10 +9,12 @@ import (
 	"testing"
 
 	"github.com/maloquacious/mappe"
+	"github.com/maloquacious/mappe/domains"
 	"github.com/maloquacious/mappe/internal/generators/flat"
 	"github.com/maloquacious/mappe/olsson"
 	"github.com/maloquacious/mappe/pipelines/flatcartographicpng"
 	"github.com/maloquacious/mappe/pipelines/flatmonochromepng"
+	"github.com/maloquacious/mappe/pipelines/flatterrainpng"
 	"github.com/maloquacious/mappe/pipelines/olssoncartographicpng"
 	"github.com/maloquacious/mappe/pipelines/olssonmonochromepng"
 	"github.com/maloquacious/mappe/renderers/cartographicpng"
@@ -135,6 +137,53 @@ func TestFlatMonochromePNGCommandRequiresOutput(t *testing.T) {
 	cmd := newCommand()
 	cmd.SetArgs([]string{"flat-monochrome-png"})
 
+	if err := cmd.Execute(); err == nil {
+		t.Fatal("command succeeded without --output")
+	}
+}
+
+func TestFlatTerrainPNGCommandWritesSelectedArtifact(t *testing.T) {
+	outputPath := filepath.Join(t.TempDir(), "flat-terrain.png")
+	cmd := newCommand()
+	cmd.SetArgs([]string{
+		"flat-terrain-png",
+		"--output", outputPath,
+		"--seed", "42",
+		"--width", "32",
+		"--height", "16",
+		"--iterations", "100",
+		"--wrap",
+	})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	img, err := png.Decode(bytes.NewReader(got))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if img.Bounds().Dx() != 32 || img.Bounds().Dy() != 16 {
+		t.Fatalf("image size = %dx%d, want 32x16", img.Bounds().Dx(), img.Bounds().Dy())
+	}
+
+	var want bytes.Buffer
+	if err := flatterrainpng.Run(&want, flat.Config{
+		Source: rand.NewPCG(42, 0), Width: 32, Height: 16, Iterations: 100, Wrap: true,
+	}, domains.DefaultClassificationConfig()); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, want.Bytes()) {
+		t.Fatal("command flags did not produce the selected pipeline output")
+	}
+}
+
+func TestFlatTerrainPNGCommandRequiresOutput(t *testing.T) {
+	cmd := newCommand()
+	cmd.SetArgs([]string{"flat-terrain-png"})
 	if err := cmd.Execute(); err == nil {
 		t.Fatal("command succeeded without --output")
 	}

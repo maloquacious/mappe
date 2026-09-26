@@ -135,8 +135,8 @@ arranges generator and renderer stages to create an artifact.
 Height-map pipelines now carry a `domains.HeightField`, which pairs the
 immutable `NormalizedHeightMap` with its `GridTopology`. Pipelines derive that
 topology from generator behavior and configuration rather than accepting
-duplicate wrapping flags. Existing PNG renderers remain topology-agnostic and
-consume the enclosed normalized height map.
+duplicate wrapping flags. Existing elevation PNG renderers remain
+topology-agnostic and consume the enclosed normalized height map.
 
 Package `renderers/monochromepng` translates a `domains.NormalizedHeightMap`
 into an 8-bit grayscale PNG. Elevation `0` is black, elevation `1` is white,
@@ -148,6 +148,14 @@ palettes preserved from `mdhender/worldgen` and John Olsson's generator. The
 default configuration allocates 55 percent of pixels to ocean, 8 percent to
 ice, and the remainder to land. Whole elevation bins are never split, so the
 actual proportions may cross those targets at a boundary.
+
+Package `renderers/terrainpng` translates a `domains.EnvironmentalMap` into an
+opaque categorical PNG with one color per terrain value. The
+`flat-terrain-png` diagnostic pipeline exercises that renderer and the full
+Cartesian classifier. It derives deterministic periodic heat, moisture, basin,
+volcanic, and local-relief fields around the flat generator's elevation output.
+Those fields are intended to expose classification and topology behavior; they
+are not a climatological model.
 
 The named `olsson-monochrome-png` pipeline composes the `olsson` generator with
 that renderer. Run it through the Cobra-based `mappe` command:
@@ -198,6 +206,18 @@ go run ./cmd/mappe flat-cartographic-png \
   --ocean-percent 55 \
   --ice-percent 8 \
   --output flat-color.png
+```
+
+Generate the diagnostic terrain map with wrapping enabled on both axes:
+
+```sh
+go run ./cmd/mappe flat-terrain-png \
+  --seed 42 \
+  --width 640 \
+  --height 320 \
+  --iterations 10000 \
+  --wrap \
+  --output flat-terrain.png
 ```
 
 ## Development

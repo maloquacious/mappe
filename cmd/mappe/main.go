@@ -23,10 +23,12 @@ import (
 	"os"
 
 	"github.com/maloquacious/mappe"
+	"github.com/maloquacious/mappe/domains"
 	"github.com/maloquacious/mappe/internal/generators/flat"
 	"github.com/maloquacious/mappe/olsson"
 	"github.com/maloquacious/mappe/pipelines/flatcartographicpng"
 	"github.com/maloquacious/mappe/pipelines/flatmonochromepng"
+	"github.com/maloquacious/mappe/pipelines/flatterrainpng"
 	"github.com/maloquacious/mappe/pipelines/olssoncartographicpng"
 	"github.com/maloquacious/mappe/pipelines/olssonmonochromepng"
 	"github.com/maloquacious/mappe/renderers/cartographicpng"
@@ -50,6 +52,7 @@ func newCommand() *cobra.Command {
 	}
 	cmd.AddCommand(newFlatCartographicPNGCommand())
 	cmd.AddCommand(newFlatMonochromePNGCommand())
+	cmd.AddCommand(newFlatTerrainPNGCommand())
 	cmd.AddCommand(newOlssonCartographicPNGCommand())
 	cmd.AddCommand(newOlssonMonochromePNGCommand())
 	cmd.AddCommand(&cobra.Command{
@@ -131,6 +134,40 @@ func newFlatMonochromePNGCommand() *cobra.Command {
 func writeFlatMonochromePNG(path string, cfg flat.Config) error {
 	return writePNG(path, func(output io.Writer) error {
 		return flatmonochromepng.Run(output, cfg)
+	})
+}
+
+func newFlatTerrainPNGCommand() *cobra.Command {
+	seed := int64(42)
+	outputPath := ""
+	cfg := flat.Config{
+		Width:      640,
+		Height:     320,
+		Iterations: 10000,
+	}
+
+	cmd := &cobra.Command{
+		Use:   "flat-terrain-png",
+		Short: "Run the flat generator and diagnostic terrain PNG renderer",
+		Args:  cobra.NoArgs,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			cfg.Source = rand.NewPCG(uint64(seed), 0)
+			return writeFlatTerrainPNG(outputPath, cfg)
+		},
+	}
+	cmd.Flags().Int64Var(&seed, "seed", seed, "pseudorandom seed")
+	cmd.Flags().IntVar(&cfg.Width, "width", cfg.Width, "map width")
+	cmd.Flags().IntVar(&cfg.Height, "height", cfg.Height, "map height")
+	cmd.Flags().IntVar(&cfg.Iterations, "iterations", cfg.Iterations, "number of circular fractures")
+	cmd.Flags().BoolVar(&cfg.Wrap, "wrap", cfg.Wrap, "wrap terrain and environmental fields across both map axes")
+	cmd.Flags().StringVarP(&outputPath, "output", "o", outputPath, "PNG output path")
+	_ = cmd.MarkFlagRequired("output")
+	return cmd
+}
+
+func writeFlatTerrainPNG(path string, cfg flat.Config) error {
+	return writePNG(path, func(output io.Writer) error {
+		return flatterrainpng.Run(output, cfg, domains.DefaultClassificationConfig())
 	})
 }
 
